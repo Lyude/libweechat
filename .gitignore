@@ -12,8 +12,8 @@ stamp-h1
 /configure
 *.o
 *.l?
-*.l?
 /compile
-/src/keyledd
-*.1
-*.5
+ltmain.sh
+/libtool
+.libs/
+ar-lib

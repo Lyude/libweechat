@@ -1,7 +1,6 @@
-AM_CFLAGS = -Wall -std=gnu11
+AM_CFLAGS = -std=gnu11 $(GLIB_CFLAGS) $(GIO_CFLAGS)
+AM_LDFLAGS = $(GLIB_LDFLAGS) $(GIO_LDFLAGS)
 
-libweechat_LTLIBRARIES = libweechat.la
-libweechat_la_SOURCES = relay_msg.c
-
-libweechat_CFLAGS= $(GLIB_CFLAGS) $(GIO_CFLAGS)
-libweechat_LDFLAGS= $(GLIB_LDFLAGS) $(GIO_LDFLAGS)
+lib_LTLIBRARIES = libweechat.la
+libweechat_la_SOURCES = relay-msg.c
+libweechat_la_LIBADD = $(GLIB_LIBS) $(GIO_LIBS)
