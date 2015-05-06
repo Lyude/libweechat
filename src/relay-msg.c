@@ -47,6 +47,7 @@ typedef GVariant* (*LibWCObjectExtractor)(void**,
 #define OBJECT_HDATA_LEN_LEN            ((gsize)4)
 #define OBJECT_HDATA_HPATH_LEN_LEN      ((gsize)4)
 #define OBJECT_HDATA_KEY_STRING_LEN_LEN ((gsize)4)
+#define OBJECT_INFOLIST_LEN_LEN         ((gsize)4)
 
 /* Variant types for objects that can't use primitive variants */
 #define OBJECT_STRING_VARIANT_TYPE (G_VARIANT_TYPE("ms"))
@@ -727,6 +728,104 @@ extract_info_object(void **pos,
 	return variant;
 }
 
+static GVariant *
+extract_infolist_object(void **pos,
+						const void *end_ptr,
+						GError **error) {
+	GVariant *variant,
+	         *name = NULL,
+	         *item_name = NULL,
+	         **items = NULL,
+			 **variables = NULL;
+	gint32 count, variable_count;
+	gsize variable_array_size = 0;
+
+	name = extract_string_object(pos, end_ptr, error);
+	if (!name)
+		goto extract_infolist_object_error;
+
+	if (!extract_size(pos, end_ptr, OBJECT_INFOLIST_LEN_LEN, &count, error))
+		goto extract_infolist_object_error;
+
+	items = g_new0(GVariant*, count);
+
+	for (int i = 0; i < count; i++) {
+		if (!extract_size(pos, end_ptr, OBJECT_INFOLIST_LEN_LEN, &variable_count,
+						  error))
+			goto extract_infolist_object_error;
+
+		/* We avoid reallocating the variables struct every time we loop by just
+		 * making it larger if we need more room in it */
+		if (variable_array_size < variable_count) {
+			variables = g_renew(GVariant*, variables, variable_count);
+			memset(variables, '\0', variable_count);
+		}
+
+		for (int i = 0; i < variable_count; i++) {
+			LibWCRelayObjectType type;
+			LibWCObjectExtractor extractor;
+			GVariant *value;
+
+			item_name = extract_string_object(pos, end_ptr, error);
+			if (!item_name)
+				goto extract_infolist_object_error;
+
+			type = extract_object_type(pos, end_ptr, error);
+			if (!type)
+				goto extract_infolist_object_error;
+
+			extractor = get_extractor_for_object_type(type);
+
+			value = extractor(pos, end_ptr, error);
+			if (!value)
+				goto extract_infolist_object_error;
+
+			variables[i] = g_variant_new_variant(
+				g_variant_new_tuple((GVariant*[]) {
+					item_name,
+					g_variant_new_byte(type),
+					value
+				}, 3));
+		}
+
+		items[i] = g_variant_new_array(G_VARIANT_TYPE_VARIANT, variables,
+									   variable_count);
+	}
+
+	variant = g_variant_new_tuple(
+		(GVariant*[]) {
+			name,
+			g_variant_new_array(g_variant_get_type(items[0]), items, count)
+		}, 2);
+
+	g_free(items);
+	g_free(variables);
+
+	return variant;
+
+extract_infolist_object_error:
+	if (name)
+		g_variant_unref(name);
+	if (item_name)
+		g_variant_unref(item_name);
+
+	if (items) {
+		for (int i = 0; i < count && items[i] != NULL; i++)
+			g_variant_unref(items[i]);
+
+		g_free(items);
+	}
+
+	if (variables) {
+		for (int i = 0; i < variable_count && variables[i] != NULL; i++)
+			g_variant_unref(variables[i]);
+
+		g_free(variables);
+	}
+
+	return NULL;
+}
+
 static LibWCObjectExtractor
 get_extractor_for_object_type(LibWCRelayObjectType type) {
 	LibWCObjectExtractor extractor;
@@ -762,10 +861,12 @@ get_extractor_for_object_type(LibWCRelayObjectType type) {
 		case LIBWC_OBJECT_TYPE_INFO:
 			extractor = extract_info_object;
 			break;
+		case LIBWC_OBJECT_TYPE_INFOLIST:
+			extractor = extract_infolist_object;
+			break;
 		case LIBWC_OBJECT_TYPE_ARRAY:
 			extractor = extract_array_object;
 			break;
-		/* TODO: Support the rest of the object types */
 		default:
 			extractor = NULL;
 			break;
