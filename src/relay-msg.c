@@ -24,16 +24,8 @@
 GHashTable *cmd_identifiers;
 GHashTable *type_identifiers;
 
-struct _LibWCRelayMessageData {
-	gint ref_count;
-	void *data;
-	void *data_endptr;
-};
-
-typedef struct _LibWCRelayMessageData LibWCRelayMessageData;
-
-typedef GVariant* (*LibWCObjectExtractor)(LibWCRelayMessageData*,
-										  void**,
+typedef GVariant* (*LibWCObjectExtractor)(void**,
+										  const void*,
 										  GError**);
 
 #define GET_FIELD(data_, offset_, type_) (*((type_*)(&((gint8*)data_)[offset_])))
@@ -60,31 +52,12 @@ typedef GVariant* (*LibWCObjectExtractor)(LibWCRelayMessageData*,
 #define OBJECT_STRING_VARIANT_TYPE (G_VARIANT_TYPE("ms"))
 #define OBJECT_BUFFER_VARIANT_TYPE (G_VARIANT_TYPE("may"))
 
-static LibWCRelayMessageData *
-libwc_relay_message_data_copy(LibWCRelayMessageData *data) {
-	data->ref_count++;
-
-	return data;
-}
-
-static void
-libwc_relay_message_data_unref(LibWCRelayMessageData *data) {
-	if (--data->ref_count != 0)
-		return;
-
-	g_free(data->data);
-	g_free(data);
-}
-
-G_DEFINE_BOXED_TYPE(LibWCRelayMessageData, libwc_relay_message_data,
-					libwc_relay_message_data_copy, libwc_relay_message_data_unref);
-
 static inline gboolean
-check_msg_bounds(const LibWCRelayMessageData *data,
-				 const void *pos,
+check_msg_bounds(const void *pos,
+				 const void *end_ptr,
 				 goffset offset,
 				 GError **error) {
-	if (G_LIKELY(pos + offset <= data->data_endptr &&
+	if (G_LIKELY(pos + offset <= end_ptr &&
 				 offset > 0))
 		return TRUE;
 
@@ -119,13 +92,13 @@ get_object_type_from_string(const gchar *str,
 }
 
 static LibWCRelayObjectType
-extract_object_type(const LibWCRelayMessageData *data,
-					void **pos,
+extract_object_type(void **pos,
+					const void *end_ptr,
 					GError **error) {
 	LibWCRelayObjectType type;
 	gchar type_str[4] = {0};
 
-	g_return_val_if_fail(check_msg_bounds(data, *pos, OBJECT_ID_LEN, error), 0);
+	g_return_val_if_fail(check_msg_bounds(*pos, end_ptr, OBJECT_ID_LEN, error), 0);
 
 	memcpy(type_str, *pos, OBJECT_ID_LEN);
 	*pos += OBJECT_ID_LEN;
@@ -138,12 +111,12 @@ extract_object_type(const LibWCRelayMessageData *data,
 }
 
 static gboolean
-extract_size(const LibWCRelayMessageData *data,
-			 void **pos,
+extract_size(void **pos,
+			 const void *end_ptr,
 			 gsize size_len,
 			 gint32 *size,
 			 GError **error) {
-	g_return_val_if_fail(check_msg_bounds(data, *pos, size_len, error), FALSE);
+	g_return_val_if_fail(check_msg_bounds(*pos, end_ptr, size_len, error), FALSE);
 
 	/* We're copying a big endian value, so we need to start from the end of the
 	 * integer, not the start
@@ -217,17 +190,17 @@ get_variant_type_for_primitive_object_type(LibWCRelayObjectType type) {
  * convience function here. This function increments pos on it's own
  */
 static void *
-extract_string(LibWCRelayMessageData *data,
-			   void **pos,
+extract_string(void **pos,
+			   const void *end_ptr,
 			   gsize strlen_field_len,
 			   GError **error) {
 	gint32 len = 0;
 	void *str;
 
-	if (!extract_size(data, pos, strlen_field_len, &len, error))
+	if (!extract_size(pos, end_ptr, strlen_field_len, &len, error))
 		return FALSE;
 
-	g_return_val_if_fail(check_msg_bounds(data, *pos, len, error), NULL);
+	g_return_val_if_fail(check_msg_bounds(*pos, end_ptr, len, error), NULL);
 
 	str = g_malloc0(len + 1);
 	memcpy(str, *pos, len);
@@ -237,18 +210,20 @@ extract_string(LibWCRelayMessageData *data,
 }
 
 static GVariant *
-extract_normal_object(LibWCRelayMessageData *data,
+extract_normal_object(void **pos,
+					  const void *end_ptr,
 					  const GVariantType *value_type,
 					  gsize size,
-					  void **pos,
+					  GDestroyNotify notify,
 					  GError **error) {
 	GVariant *object;
+	void *data;
 
-	g_return_val_if_fail(check_msg_bounds(data, *pos, size, error), NULL);
+	g_return_val_if_fail(check_msg_bounds(*pos, end_ptr, size, error), NULL);
 
-	object = g_variant_new_from_data(value_type, *pos, size, FALSE,
-									 (GDestroyNotify)libwc_relay_message_data_unref,
-									 libwc_relay_message_data_copy(data));
+	data = g_slice_copy(size, *pos);
+	object = g_variant_new_from_data(value_type, data, size, FALSE, notify,
+									 data);
 	*pos += size;
 
 #if G_BYTE_ORDER == G_LITTLE_ENDIAN
@@ -260,31 +235,37 @@ extract_normal_object(LibWCRelayMessageData *data,
 	return object;
 }
 
+static void
+free_char_object(void *mem) { g_slice_free(gchar, mem); }
+
 static GVariant *
-extract_char_object(LibWCRelayMessageData *data,
-					void **pos,
+extract_char_object(void **pos,
+					const void *end_ptr,
 					GError **error) {
-	return extract_normal_object(data, G_VARIANT_TYPE_BYTE, sizeof(gchar), pos,
-								 error);
+	return extract_normal_object(pos, end_ptr, G_VARIANT_TYPE_BYTE,
+								 sizeof(gchar), free_char_object, error);
 }
 
+static void
+free_int_object(void *mem) { g_slice_free(gint32, mem); }
+
 static GVariant *
-extract_int_object(LibWCRelayMessageData *data,
-				   void **pos,
+extract_int_object(void **pos,
+				   const void *end_ptr,
 				   GError **error) {
-	return extract_normal_object(data, G_VARIANT_TYPE_INT32, sizeof(gint32),
-								 pos, error);
+	return extract_normal_object(pos, end_ptr, G_VARIANT_TYPE_INT32,
+								 sizeof(gint32), free_int_object, error);
 }
 
 static GVariant *
-extract_long_object(LibWCRelayMessageData *data,
-					void **pos,
+extract_long_object(void **pos,
+					const void *end_ptr,
 					GError **error) {
 	GVariant *object;
 	gchar *str;
 	glong value;
 
-	str = extract_string(data, pos, OBJECT_LONG_LEN_LEN, error);
+	str = extract_string(pos, end_ptr, OBJECT_LONG_LEN_LEN, error);
 	if (!str)
 		return NULL;
 
@@ -305,14 +286,14 @@ extract_long_object(LibWCRelayMessageData *data,
 }
 
 static GVariant *
-extract_string_object(LibWCRelayMessageData *data,
-					  void **pos,
+extract_string_object(void **pos,
+					  const void *end_ptr,
 					  GError **error) {
 	GVariant *object, *maybe_container;
 	gchar *str;
 	gint32 len = 0;
 
-	if (!extract_size(data, pos, OBJECT_STRING_LEN_LEN, &len, error))
+	if (!extract_size(pos, end_ptr, OBJECT_STRING_LEN_LEN, &len, error))
 		return NULL;
 
 	if (len == 0)
@@ -320,7 +301,7 @@ extract_string_object(LibWCRelayMessageData *data,
 	else if (len == -1)
 		object = NULL;
 	else {
-		g_return_val_if_fail(check_msg_bounds(data, *pos, len, error), NULL);
+		g_return_val_if_fail(check_msg_bounds(*pos, end_ptr, len, error), NULL);
 
 		str = g_new0(gchar, len + 1);
 		memcpy(str, *pos, len);
@@ -335,13 +316,14 @@ extract_string_object(LibWCRelayMessageData *data,
 }
 
 static GVariant *
-extract_buffer_object(LibWCRelayMessageData *data,
-					  void **pos,
+extract_buffer_object(void **pos,
+					  const void *end_ptr,
 					  GError **error) {
 	GVariant *object, *maybe_container;
+	void *data;
 	gint32 len = 0;
 
-	if (!extract_size(data, pos, OBJECT_BUFFER_LEN_LEN, &len, error))
+	if (!extract_size(pos, end_ptr, OBJECT_BUFFER_LEN_LEN, &len, error))
 		return NULL;
 
 	if (len == 0)
@@ -349,12 +331,12 @@ extract_buffer_object(LibWCRelayMessageData *data,
 	else if (len == -1)
 		object = NULL;
 	else {
-		g_return_val_if_fail(check_msg_bounds(data, *pos, len, error), NULL);
+		g_return_val_if_fail(check_msg_bounds(*pos, end_ptr, len, error), NULL);
 
+		data = g_memdup(*pos, len);
 		object =
-			g_variant_new_from_data(G_VARIANT_TYPE_BYTESTRING, *pos, len, FALSE,
-									(GDestroyNotify)libwc_relay_message_data_unref,
-									libwc_relay_message_data_copy(data));
+			g_variant_new_from_data(OBJECT_BUFFER_VARIANT_TYPE, data, len,
+									FALSE, g_free, data);
 		*pos += len;
 	}
 
@@ -364,17 +346,17 @@ extract_buffer_object(LibWCRelayMessageData *data,
 }
 
 static GVariant *
-extract_pointer_object(LibWCRelayMessageData *data,
-					   void **pos,
+extract_pointer_object(void **pos,
+					   const void *end_ptr,
 					   GError **error) {
 	GVariant *object;
 	guint64 value;
 	gint32 len = 0;
 
-	if (!extract_size(data, pos, OBJECT_POINTER_LEN_LEN, &len, error))
+	if (!extract_size(pos, end_ptr, OBJECT_POINTER_LEN_LEN, &len, error))
 		return NULL;
 
-	g_return_val_if_fail(check_msg_bounds(data, *pos, len, error), NULL);
+	g_return_val_if_fail(check_msg_bounds(*pos, end_ptr, len, error), NULL);
 
 	/* If we have a length of 01, and the next byte is 0, we have a NULL
 	 * pointer */
@@ -407,15 +389,15 @@ extract_pointer_object(LibWCRelayMessageData *data,
 }
 
 static GVariant *
-extract_time_object(LibWCRelayMessageData *data,
-					void **pos,
+extract_time_object(void **pos,
+					const void *end_ptr,
 					GError **error) {
 	GVariant *object;
 	gchar *str;
 	guint64 value;
 	gsize len = 0;
 
-	str = extract_string(data, pos, OBJECT_TIME_LEN_LEN, error);
+	str = extract_string(pos, end_ptr, OBJECT_TIME_LEN_LEN, error);
 	if (!str)
 		return NULL;
 
@@ -436,8 +418,8 @@ extract_time_object(LibWCRelayMessageData *data,
 }
 
 static GVariant *
-extract_array_object(LibWCRelayMessageData *data,
-					 void **pos,
+extract_array_object(void **pos,
+					 const void *end_ptr,
 					 GError **error) {
 	GVariant *variant,
 	         **array_contents, **tuple_contents;
@@ -446,19 +428,19 @@ extract_array_object(LibWCRelayMessageData *data,
 	LibWCObjectExtractor element_extractor;
 	gint32 count = 0;
 
-	object_type = extract_object_type(data, pos, error);
+	object_type = extract_object_type(pos, end_ptr, error);
 	if (!object_type)
 		return NULL;
 	g_return_val_if_fail(object_type_is_primitive(object_type), NULL);
 
-	if (!extract_size(data, pos, OBJECT_ARRAY_LEN_LEN, &count, error))
+	if (!extract_size(pos, end_ptr, OBJECT_ARRAY_LEN_LEN, &count, error))
 		return NULL;
 
 	element_extractor = get_extractor_for_object_type(object_type);
 	array_contents = g_new0(GVariant*, count);
 
 	for (int i = 0; i < count; i++) {
-		array_contents[i] = element_extractor(data, pos, error);
+		array_contents[i] = element_extractor(pos, end_ptr, error);
 		if (!array_contents[i]) {
 			for (int i = 0; i < count || array_contents[i] == NULL; i++)
 				g_variant_unref(array_contents[i]);
@@ -481,8 +463,8 @@ extract_array_object(LibWCRelayMessageData *data,
 }
 
 static GVariant *
-extract_hashtable_object(LibWCRelayMessageData *data,
-						 void **pos,
+extract_hashtable_object(void **pos,
+						 const void *end_ptr,
 						 GError **error)
 {
 	GVariant *variant,
@@ -492,17 +474,17 @@ extract_hashtable_object(LibWCRelayMessageData *data,
 	LibWCObjectExtractor key_extractor, value_extractor;
 	gint32 count;
 
-	key_type = extract_object_type(data, pos, error);
+	key_type = extract_object_type(pos, end_ptr, error);
 	if (!key_type)
 		return NULL;
 	g_return_val_if_fail(object_type_is_primitive(key_type), NULL);
 
-	value_type = extract_object_type(data, pos, error);
+	value_type = extract_object_type(pos, end_ptr, error);
 	if (!value_type)
 		return NULL;
 	g_return_val_if_fail(object_type_is_primitive(value_type), NULL);
 
-	if (!extract_size(data, pos, OBJECT_HASHTABLE_LEN_LEN, &count, error))
+	if (!extract_size(pos, end_ptr, OBJECT_HASHTABLE_LEN_LEN, &count, error))
 		return NULL;
 
 	key_extractor = get_extractor_for_object_type(key_type);
@@ -511,11 +493,11 @@ extract_hashtable_object(LibWCRelayMessageData *data,
 	entries = g_new0(GVariant*, count);
 
 	for (int i = 0; i < count; i++) {
-		key = key_extractor(data, pos, error);
+		key = key_extractor(pos, end_ptr, error);
 		if (!key)
 			goto extract_hashtable_object_error;
 
-		value = value_extractor(data, pos, error);
+		value = value_extractor(pos, end_ptr, error);
 		if (!value) {
 			g_variant_unref(key);
 			goto extract_hashtable_object_error;
@@ -547,8 +529,8 @@ extract_hashtable_object_error:
 }
 
 static GVariant *
-extract_hdata_object(LibWCRelayMessageData *data,
-					 void **pos,
+extract_hdata_object(void **pos,
+					 const void *end_ptr,
 					 GError **error) {
 	GVariant *variant = NULL;
 	GVariant **hdata_items = NULL,
@@ -564,7 +546,7 @@ extract_hdata_object(LibWCRelayMessageData *data,
 		LibWCRelayObjectType type;
 	} *key_info;
 
-	hpath = extract_string(data, pos, OBJECT_HDATA_HPATH_LEN_LEN, error);
+	hpath = extract_string(pos, end_ptr, OBJECT_HDATA_HPATH_LEN_LEN, error);
 	if (!hpath)
 		return NULL;
 
@@ -574,7 +556,7 @@ extract_hdata_object(LibWCRelayMessageData *data,
 	/* Extract the type information for each of the keys. Since we can expect
 	 * all of the values in each hdata item to be in order, it's easier to do
 	 * this in an array */
-	key_string = extract_string(data, pos, OBJECT_HDATA_KEY_STRING_LEN_LEN,
+	key_string = extract_string(pos, end_ptr, OBJECT_HDATA_KEY_STRING_LEN_LEN,
 								error);
 	if (!key_string)
 		goto extract_hdata_object_error;
@@ -618,7 +600,7 @@ extract_hdata_object(LibWCRelayMessageData *data,
 		g_strfreev(split_str);
 	}
 
-	if (!extract_size(data, pos, OBJECT_HDATA_LEN_LEN, &count, error))
+	if (!extract_size(pos, end_ptr, OBJECT_HDATA_LEN_LEN, &count, error))
 		goto extract_hdata_object_error;
 
 	hdata_items = g_new0(GVariant*, count);
@@ -632,7 +614,7 @@ extract_hdata_object(LibWCRelayMessageData *data,
 		/* First comes the p-path objects */
 		p_path = g_variant_dict_new(NULL);
 		for (int j = 0; j < hpath_count; j++) {
-			value = extract_pointer_object(data, pos, error);
+			value = extract_pointer_object(pos, end_ptr, error);
 			if (!value) {
 				g_variant_dict_unref(p_path);
 				goto extract_hdata_object_error;
@@ -646,7 +628,7 @@ extract_hdata_object(LibWCRelayMessageData *data,
 		for (int j = 0; j < key_count; j++) {
 			value_extractor = get_extractor_for_object_type(key_info[j].type);
 
-			value = value_extractor(data, pos, error);
+			value = value_extractor(pos, end_ptr, error);
 			if (!value) {
 				g_variant_dict_unref(p_path);
 				g_variant_dict_unref(keys);
@@ -727,16 +709,16 @@ extract_hdata_object_error:
 }
 
 static GVariant *
-extract_info_object(LibWCRelayMessageData *data,
-					void **pos,
+extract_info_object(void **pos,
+					const void *end_ptr,
 					GError **error) {
 	GVariant *variant, *name, *value;
 
-	name = extract_string_object(data, pos, error);
+	name = extract_string_object(pos, end_ptr, error);
 	if (!name)
 		return NULL;
 
-	value = extract_string_object(data, pos, error);
+	value = extract_string_object(pos, end_ptr, error);
 	if (!value)
 		return NULL;
 
@@ -793,20 +775,20 @@ get_extractor_for_object_type(LibWCRelayObjectType type) {
 } G_GNUC_PURE
 
 static LibWCRelayMessageObject *
-extract_object(LibWCRelayMessageData *data,
-			   void **pos,
+extract_object(void **pos,
+			   const void *end_ptr,
 			   GError **error) {
 	GVariant *variant;
 	LibWCRelayMessageObject *object;
 	LibWCObjectExtractor extractor;
 	LibWCRelayObjectType type;
 
-	type = extract_object_type(data, pos, error);
+	type = extract_object_type(pos, end_ptr, error);
 	if (!type)
 		return NULL;
 
 	extractor = get_extractor_for_object_type(type);
-	variant = extractor(data, pos, error);
+	variant = extractor(pos, end_ptr, error);
 	if (!variant)
 		return NULL;
 
@@ -818,14 +800,15 @@ extract_object(LibWCRelayMessageData *data,
 }
 
 static GList *
-extract_objects(LibWCRelayMessageData *data,
+extract_objects(void *data,
+				const void *end_ptr,
 				GError **error) {
 	LibWCRelayMessageObject *object;
 	GList *objects = NULL;
-	void *pos = data->data;
+	void *pos = data;
 
-	while (pos < data->data_endptr) {
-		object = extract_object(data, &pos, error);
+	while (pos < end_ptr) {
+		object = extract_object(&pos, end_ptr, error);
 		if (!object)
 			goto extract_objects_error;
 
@@ -848,26 +831,18 @@ libwc_relay_message_parse_data(void *data,
 							   gsize size,
 							   GError **error) {
 	LibWCRelayMessage *message = g_new(LibWCRelayMessage, 1);
-	LibWCRelayMessageData *message_data = g_new(LibWCRelayMessageData, 1);
-
-	message_data->ref_count = 1;
-	message_data->data = g_memdup(data, size);
-	message_data->data_endptr = data + size;
 
 	message->id = 0;
-	message->objects = extract_objects(message_data, error);
+	message->objects = extract_objects(data, data + size, error);
 
 	if (!message->objects)
 		goto libwc_relay_message_parse_data_error;
-
-	libwc_relay_message_data_unref(message_data);
 
 	return message;
 
 libwc_relay_message_parse_data_error:
 	/* TODO: Fix memory leaks here */
 	g_free(message);
-	libwc_relay_message_data_unref(message_data);
 
 	return NULL;
 }
