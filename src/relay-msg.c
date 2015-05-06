@@ -726,6 +726,25 @@ extract_hdata_object_error:
 	return NULL;
 }
 
+static GVariant *
+extract_info_object(LibWCRelayMessageData *data,
+					void **pos,
+					GError **error) {
+	GVariant *variant, *name, *value;
+
+	name = extract_string_object(data, pos, error);
+	if (!name)
+		return NULL;
+
+	value = extract_string_object(data, pos, error);
+	if (!value)
+		return NULL;
+
+	variant = g_variant_new_tuple((GVariant*[]) { name, value }, 2);
+
+	return variant;
+}
+
 static LibWCObjectExtractor
 get_extractor_for_object_type(LibWCRelayObjectType type) {
 	LibWCObjectExtractor extractor;
@@ -757,6 +776,9 @@ get_extractor_for_object_type(LibWCRelayObjectType type) {
 			break;
 		case LIBWC_OBJECT_TYPE_HDATA:
 			extractor = extract_hdata_object;
+			break;
+		case LIBWC_OBJECT_TYPE_INFO:
+			extractor = extract_info_object;
 			break;
 		case LIBWC_OBJECT_TYPE_ARRAY:
 			extractor = extract_array_object;
@@ -829,7 +851,7 @@ libwc_relay_message_parse_data(void *data,
 	LibWCRelayMessageData *message_data = g_new(LibWCRelayMessageData, 1);
 
 	message_data->ref_count = 1;
-	message_data->data = data;
+	message_data->data = g_memdup(data, size);
 	message_data->data_endptr = data + size;
 
 	message->id = 0;
