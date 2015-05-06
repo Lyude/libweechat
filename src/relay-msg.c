@@ -45,12 +45,16 @@ typedef GVariant* (*LibWCObjectExtractor)(LibWCRelayMessageData*,
  * for an object in the weechat protocol varies depending on the actual object
  * in question.
  */
-#define OBJECT_LONG_LEN_LEN    ((gsize)1)
-#define OBJECT_STRING_LEN_LEN  ((gsize)4)
-#define OBJECT_BUFFER_LEN_LEN  ((gsize)4)
-#define OBJECT_POINTER_LEN_LEN ((gsize)1)
-#define OBJECT_TIME_LEN_LEN    ((gsize)1)
-#define OBJECT_ARRAY_LEN_LEN   ((gsize)4)
+#define OBJECT_LONG_LEN_LEN             ((gsize)1)
+#define OBJECT_STRING_LEN_LEN           ((gsize)4)
+#define OBJECT_BUFFER_LEN_LEN           ((gsize)4)
+#define OBJECT_POINTER_LEN_LEN          ((gsize)1)
+#define OBJECT_TIME_LEN_LEN             ((gsize)1)
+#define OBJECT_ARRAY_LEN_LEN            ((gsize)4)
+#define OBJECT_HASHTABLE_LEN_LEN        ((gsize)4)
+#define OBJECT_HDATA_LEN_LEN            ((gsize)4)
+#define OBJECT_HDATA_HPATH_LEN_LEN      ((gsize)4)
+#define OBJECT_HDATA_KEY_STRING_LEN_LEN ((gsize)4)
 
 /* Variant types for objects that can't use primitive variants */
 #define OBJECT_STRING_VARIANT_TYPE (G_VARIANT_TYPE("ms"))
@@ -94,6 +98,27 @@ static LibWCObjectExtractor
 get_extractor_for_object_type(LibWCRelayObjectType type);
 
 static LibWCRelayObjectType
+get_object_type_from_string(const gchar *str,
+							GError **error) {
+	LibWCRelayObjectType type;
+
+	type = (LibWCRelayObjectType)g_hash_table_lookup(type_identifiers, str);
+	if (!type) {
+		gchar *data_type = g_strescape(str, NULL);
+
+		g_warn_if_reached();
+		g_set_error(error, LIBWC_ERROR_RELAY, LIBWC_ERROR_RELAY_INVALID_DATA,
+					"Unknown data type encountered: '%s'", data_type);
+
+		g_free(data_type);
+
+		return 0;
+	}
+
+	return type;
+}
+
+static LibWCRelayObjectType
 extract_object_type(const LibWCRelayMessageData *data,
 					void **pos,
 					GError **error) {
@@ -105,18 +130,9 @@ extract_object_type(const LibWCRelayMessageData *data,
 	memcpy(type_str, *pos, OBJECT_ID_LEN);
 	*pos += OBJECT_ID_LEN;
 
-	type = (LibWCRelayObjectType)g_hash_table_lookup(type_identifiers, type_str);
-	if (!type) {
-		gchar *data_type = g_strescape(type_str, NULL);
-
-		g_warn_if_reached();
-		g_set_error(error, LIBWC_ERROR_RELAY, LIBWC_ERROR_RELAY_INVALID_DATA,
-					"Unknown data type encountered: '%s'", data_type);
-
-		g_free(data_type);
-
+	type = get_object_type_from_string(type_str, error);
+	if (!type)
 		return 0;
-	}
 
 	return type;
 }
@@ -464,6 +480,252 @@ extract_array_object(LibWCRelayMessageData *data,
 	return variant;
 }
 
+static GVariant *
+extract_hashtable_object(LibWCRelayMessageData *data,
+						 void **pos,
+						 GError **error)
+{
+	GVariant *variant,
+			 *key, *value;
+	GVariant **entries = NULL;
+	LibWCRelayObjectType key_type, value_type;
+	LibWCObjectExtractor key_extractor, value_extractor;
+	gint32 count;
+
+	key_type = extract_object_type(data, pos, error);
+	if (!key_type)
+		return NULL;
+	g_return_val_if_fail(object_type_is_primitive(key_type), NULL);
+
+	value_type = extract_object_type(data, pos, error);
+	if (!value_type)
+		return NULL;
+	g_return_val_if_fail(object_type_is_primitive(value_type), NULL);
+
+	if (!extract_size(data, pos, OBJECT_HASHTABLE_LEN_LEN, &count, error))
+		return NULL;
+
+	key_extractor = get_extractor_for_object_type(key_type);
+	value_extractor = get_extractor_for_object_type(value_type);
+
+	entries = g_new0(GVariant*, count);
+
+	for (int i = 0; i < count; i++) {
+		key = key_extractor(data, pos, error);
+		if (!key)
+			goto extract_hashtable_object_error;
+
+		value = value_extractor(data, pos, error);
+		if (!value) {
+			g_variant_unref(key);
+			goto extract_hashtable_object_error;
+		}
+
+		entries[i] = g_variant_new_tuple((GVariant*[]) { key, value }, 2);
+	}
+
+	variant = g_variant_new_tuple(
+		(GVariant*[]) {
+			g_variant_new_byte(key_type),
+			g_variant_new_byte(value_type),
+			g_variant_new_array(G_VARIANT_TYPE_TUPLE, entries, count)
+		}, 3);
+
+	g_free(entries);
+
+	return variant;
+
+extract_hashtable_object_error:
+	if (entries) {
+		for (int i = 0; i < count && entries[i] != NULL; i++)
+			g_variant_unref(entries[i]);
+
+		g_free(entries);
+	}
+
+	return NULL;
+}
+
+static GVariant *
+extract_hdata_object(LibWCRelayMessageData *data,
+					 void **pos,
+					 GError **error) {
+	GVariant *variant = NULL;
+	GVariant **hdata_items = NULL,
+			 **key_info_variants, **hpath_name_variants;
+	const GVariantType *key_info_variant_type;
+	gchar *hpath = NULL,
+	      *key_string = NULL;
+	gchar **hpath_names = NULL, **key_names = NULL;
+	gsize hpath_count, key_count;
+	gint32 count;
+	struct {
+		gchar *name;
+		LibWCRelayObjectType type;
+	} *key_info;
+
+	hpath = extract_string(data, pos, OBJECT_HDATA_HPATH_LEN_LEN, error);
+	if (!hpath)
+		return NULL;
+
+	hpath_names = g_strsplit(hpath, "/", -1);
+	hpath_count = g_strv_length(hpath_names);
+
+	/* Extract the type information for each of the keys. Since we can expect
+	 * all of the values in each hdata item to be in order, it's easier to do
+	 * this in an array */
+	key_string = extract_string(data, pos, OBJECT_HDATA_KEY_STRING_LEN_LEN,
+								error);
+	if (!key_string)
+		goto extract_hdata_object_error;
+
+	key_names = g_strsplit(key_string, ",", -1);
+	key_count = g_strv_length(key_names);
+
+	key_info = g_malloc0(sizeof(*key_info) * key_count);
+
+	/* Convert the string containing the key names and their types into the
+	 * key_info struct we defined earlier, this makes looking up the data type
+	 * for each key much faster and easier */
+	for (int i = 0; key_names[i] != NULL; i++) {
+		gchar **split_str = g_strsplit(key_names[i], ":", 2);
+
+		if (g_strv_length(split_str) < 2) {
+			gchar *key_type = g_strescape(key_names[i], NULL);
+
+			g_warn_if_reached();
+
+			g_set_error(error, LIBWC_ERROR_RELAY, LIBWC_ERROR_RELAY_INVALID_DATA,
+						"Invalid key:datatype specification in hdata: \"%s\"",
+						key_type);
+
+			g_strfreev(split_str);
+			g_free(key_type);
+
+			goto extract_hdata_object_error;
+		}
+
+		key_info[i].type = get_object_type_from_string(split_str[1], error);
+
+		if (!key_info[i].type) {
+			g_strfreev(split_str);
+			goto extract_hdata_object_error;
+		}
+
+		key_info[i].name = split_str[0];
+		split_str[0] = NULL;
+
+		g_strfreev(split_str);
+	}
+
+	if (!extract_size(data, pos, OBJECT_HDATA_LEN_LEN, &count, error))
+		goto extract_hdata_object_error;
+
+	hdata_items = g_new0(GVariant*, count);
+
+	/* Actually parse all of the hdata objects */
+	for (int i = 0; i < count; i++) {
+		GVariantDict *p_path, *keys;
+		LibWCObjectExtractor value_extractor;
+		GVariant *value;
+
+		/* First comes the p-path objects */
+		p_path = g_variant_dict_new(NULL);
+		for (int j = 0; j < hpath_count; j++) {
+			value = extract_pointer_object(data, pos, error);
+			if (!value) {
+				g_variant_dict_unref(p_path);
+				goto extract_hdata_object_error;
+			}
+
+			g_variant_dict_insert_value(p_path, hpath_names[j], value);
+		}
+
+		/* Next comes the actual objects */
+		keys = g_variant_dict_new(NULL);
+		for (int j = 0; j < key_count; j++) {
+			value_extractor = get_extractor_for_object_type(key_info[j].type);
+
+			value = value_extractor(data, pos, error);
+			if (!value) {
+				g_variant_dict_unref(p_path);
+				g_variant_dict_unref(keys);
+				goto extract_hdata_object_error;
+			}
+
+			g_variant_dict_insert_value(keys, key_info[j].name, value);
+		}
+
+		/* Pack them in a tuple, inside a variant container. We use the extra
+		 * container so that the type remains fixed, so we can later put them in
+		 * an array */
+		hdata_items[i] = g_variant_new_variant(
+			g_variant_new_tuple((GVariant*[]) {
+				g_variant_dict_end(p_path),
+				g_variant_dict_end(keys)
+			}, 2)
+		);
+	}
+
+	hpath_name_variants = g_new(GVariant*, hpath_count);
+	for (int i = 0; i < hpath_count; i++)
+	   	hpath_name_variants[i] = g_variant_new_take_string(hpath_names[i]);
+
+	/* Take the key_info struct we made before, and convert it into an array we
+	 * pack with the hdata struct to provide a description of it's layout */
+	key_info_variants = g_new(GVariant*, key_count);
+	for (int i = 0; i < key_count; i++) {
+		key_info_variants[i] = g_variant_new_tuple(
+			(GVariant*[]) {
+				g_variant_new_take_string(key_info[i].name),
+				g_variant_new_byte(key_info[i].type)
+			}, 2);
+	}
+
+	key_info_variant_type = g_variant_get_type(key_info_variants[0]);
+
+	/* Finally pack everything in a variant that we can return */
+	variant = g_variant_new_tuple(
+		(GVariant*[]) {
+			g_variant_new_array(G_VARIANT_TYPE_STRING, hpath_name_variants,
+								hpath_count),
+			g_variant_new_array(key_info_variant_type, key_info_variants,
+								key_count),
+			g_variant_new_array(G_VARIANT_TYPE_VARIANT, hdata_items, count)
+		}, 3);
+
+	g_free(hpath);
+	g_free(key_string);
+	/* We don't need to worry about freeing the elements in any of these
+	 * variables, at this point all of them have been taken by a GVariant of
+	 * some sort */
+	g_free(hpath_names);
+	g_free(key_names);
+	g_free(key_info);
+	g_free(hpath_name_variants);
+	g_free(key_info_variants);
+	g_free(hdata_items);
+
+	return variant;
+
+extract_hdata_object_error:
+	g_strfreev(hpath_names);
+	g_strfreev(key_names);
+
+	g_free(hpath);
+	g_free(key_string);
+	g_free(key_info);
+
+	if (hdata_items) {
+		for (int i = 0; i < count && hdata_items[i] != NULL; i++)
+			g_variant_unref(hdata_items[i]);
+
+		g_free(hdata_items);
+	}
+
+	return NULL;
+}
+
 static LibWCObjectExtractor
 get_extractor_for_object_type(LibWCRelayObjectType type) {
 	LibWCObjectExtractor extractor;
@@ -489,6 +751,12 @@ get_extractor_for_object_type(LibWCRelayObjectType type) {
 			break;
 		case LIBWC_OBJECT_TYPE_TIME:
 			extractor = extract_time_object;
+			break;
+		case LIBWC_OBJECT_TYPE_HASHTABLE:
+			extractor = extract_hashtable_object;
+			break;
+		case LIBWC_OBJECT_TYPE_HDATA:
+			extractor = extract_hdata_object;
 			break;
 		case LIBWC_OBJECT_TYPE_ARRAY:
 			extractor = extract_array_object;
