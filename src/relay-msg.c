@@ -901,15 +901,14 @@ extract_object(void **pos,
 }
 
 static GList *
-extract_objects(void *data,
+extract_objects(void **pos,
 				const void *end_ptr,
 				GError **error) {
 	LibWCRelayMessageObject *object;
 	GList *objects = NULL;
-	void *pos = data;
 
-	while (pos < end_ptr) {
-		object = extract_object(&pos, end_ptr, error);
+	while (*pos < end_ptr) {
+		object = extract_object(pos, end_ptr, error);
 		if (!object)
 			goto extract_objects_error;
 
@@ -937,7 +936,7 @@ libwc_relay_message_parse_data(void *data,
 	LibWCRelayMessage *message = g_new(LibWCRelayMessage, 1);
 
 	message->id = 0;
-	message->objects = extract_objects(data, data + size, error);
+	message->objects = extract_objects(&data, data + size, error);
 
 	if (!message->objects)
 		goto libwc_relay_message_parse_data_error;
