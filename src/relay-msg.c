@@ -928,15 +928,39 @@ extract_objects_error:
     return NULL;
 }
 
+LibWCCommandIdentifier
+extract_command_identifier(void **pos,
+                           const void *end_ptr,
+                           GError **error) {
+    LibWCCommandIdentifier cmd_identifier;
+    gchar *identifier_string =
+        extract_string(pos, end_ptr, OBJECT_STRING_LEN_LEN, TRUE, error);
+
+    /* If the string is NULL, there's no ID */
+    if (!identifier_string)
+        return 0;
+
+    cmd_identifier = (LibWCCommandIdentifier)g_hash_table_lookup(
+        cmd_identifiers, identifier_string);
+
+    return cmd_identifier;
+}
+
 LibWCRelayMessage *
 libwc_relay_message_parse_data(void *data,
                                gsize size,
                                GError **error) {
+    void *pos = data;
+    const void *end_ptr = data + size;
     LibWCRelayMessage *message = g_new(LibWCRelayMessage, 1);
 
-    message->id = 0;
-    message->objects = extract_objects(&data, data + size, error);
+    g_assert_null(*error);
 
+    message->id = extract_command_identifier(&pos, end_ptr, error);
+    if (*error)
+        goto libwc_relay_message_parse_data_error;
+
+    message->objects = extract_objects(&pos, data + size, error);
     if (!message->objects)
         goto libwc_relay_message_parse_data_error;
 
@@ -952,6 +976,12 @@ static inline void
 init_object_type(gchar *str,
                  LibWCRelayObjectType type) {
     g_hash_table_insert(type_identifiers, str, GINT_TO_POINTER(type));
+}
+
+static inline void
+init_cmd_identifier(gchar *str,
+                    LibWCCommandIdentifier id) {
+    g_hash_table_insert(cmd_identifiers, str, GINT_TO_POINTER(id));
 }
 
 void
@@ -974,4 +1004,25 @@ _libwc_init_msg_parser() {
     init_object_type("inf", LIBWC_OBJECT_TYPE_INFO);
     init_object_type("inl", LIBWC_OBJECT_TYPE_INFOLIST);
     init_object_type("arr", LIBWC_OBJECT_TYPE_ARRAY);
+
+    init_cmd_identifier("_buffer_opened",           LIBWC_CMD_BUFFER_OPENED);
+    init_cmd_identifier("_buffer_type_changed",     LIBWC_CMD_BUFFER_TYPE_CHANGED);
+    init_cmd_identifier("_buffer_moved",            LIBWC_CMD_BUFFER_MOVED);
+    init_cmd_identifier("_buffer_merged",           LIBWC_CMD_BUFFER_MERGED);
+    init_cmd_identifier("_buffer_unmerged",         LIBWC_CMD_BUFFER_UNMERGED);
+    init_cmd_identifier("_buffer_hidden",           LIBWC_CMD_BUFFER_HIDDEN);
+    init_cmd_identifier("_buffer_unhidden",         LIBWC_CMD_BUFFER_UNHIDDEN);
+    init_cmd_identifier("_buffer_renamed",          LIBWC_CMD_BUFFER_RENAMED);
+    init_cmd_identifier("_buffer_title_changed",    LIBWC_CMD_BUFFER_TITLE_CHANGED);
+    init_cmd_identifier("_buffer_localvar_added",   LIBWC_CMD_BUFFER_LOCALVAR_ADDED);
+    init_cmd_identifier("_buffer_localvar_changed", LIBWC_CMD_BUFFER_LOCALVAR_CHANGED);
+    init_cmd_identifier("_buffer_localvar_removed", LIBWC_CMD_BUFFER_LOCALVAR_REMOVED);
+    init_cmd_identifier("_buffer_closing",          LIBWC_CMD_BUFFER_CLOSING);
+    init_cmd_identifier("_buffer_cleared",          LIBWC_CMD_BUFFER_CLEARED);
+    init_cmd_identifier("_buffer_line_added",       LIBWC_CMD_BUFFER_LINE_ADDED);
+    init_cmd_identifier("_nicklist",                LIBWC_CMD_NICKLIST);
+    init_cmd_identifier("_nicklist_diff",           LIBWC_CMD_NICKLIST_DIFF);
+    init_cmd_identifier("_pong",                    LIBWC_CMD_PONG);
+    init_cmd_identifier("_upgrade",                 LIBWC_CMD_UPGRADE);
+    init_cmd_identifier("_upgrade_ended",           LIBWC_CMD_UPGRADE_ENDED);
 }

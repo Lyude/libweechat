@@ -52,6 +52,54 @@ wc_type_to_string(LibWCRelayObjectType type) {
     }
 }
 
+static char *
+wc_cmd_id_to_string(LibWCCommandIdentifier id) {
+    switch (id) {
+        case LIBWC_CMD_BUFFER_OPENED:
+            return "Buffer opened";
+        case LIBWC_CMD_BUFFER_TYPE_CHANGED:
+            return "Buffer type changed";
+        case LIBWC_CMD_BUFFER_MOVED:
+            return "Buffer moved";
+        case LIBWC_CMD_BUFFER_MERGED:
+            return "Buffer merged";
+        case LIBWC_CMD_BUFFER_UNMERGED:
+            return "Buffer unmerged";
+        case LIBWC_CMD_BUFFER_HIDDEN:
+            return "Buffer hidden";
+        case LIBWC_CMD_BUFFER_UNHIDDEN:
+            return "Buffer unhidden";
+        case LIBWC_CMD_BUFFER_RENAMED:
+            return "Buffer renamed";
+        case LIBWC_CMD_BUFFER_TITLE_CHANGED:
+            return "Buffer title changed";
+        case LIBWC_CMD_BUFFER_LOCALVAR_ADDED:
+            return "Buffer localvar added";
+        case LIBWC_CMD_BUFFER_LOCALVAR_CHANGED:
+            return "Buffer localvar changed";
+        case LIBWC_CMD_BUFFER_LOCALVAR_REMOVED:
+            return "Buffer localvar removed";
+        case LIBWC_CMD_BUFFER_CLOSING:
+            return "Buffer closing";
+        case LIBWC_CMD_BUFFER_CLEARED:
+            return "Buffer cleared";
+        case LIBWC_CMD_BUFFER_LINE_ADDED:
+            return "Buffer line added";
+        case LIBWC_CMD_NICKLIST:
+            return "Nicklist";
+        case LIBWC_CMD_NICKLIST_DIFF:
+            return "Nicklist diff";
+        case LIBWC_CMD_PONG:
+            return "Pong";
+        case LIBWC_CMD_UPGRADE:
+            return "Upgrade";
+        case LIBWC_CMD_UPGRADE_ENDED:
+            return "Upgrade ended";
+        default:
+            return "???";
+    }
+}
+
 int main(int argc, char *argv[]) {
     GIOChannel *stdin_channel;
     gchar *data;
@@ -69,12 +117,18 @@ int main(int argc, char *argv[]) {
                          -1);
 
     /* We start at 5 bytes after data so that we can skip the header */
-    message = libwc_relay_message_parse_data(data + 9, data_len - 9, &error);
+    message = libwc_relay_message_parse_data(data + 5, data_len - 5, &error);
     if (!message) {
         fprintf(stderr, "Failed to parse message: %s\n",
                 error->message);
         exit(1);
     }
+
+    if (message->id)
+        printf("Message ID: %s\n",
+               wc_cmd_id_to_string(message->id));
+    else
+        printf("Message ID: None\n");
 
     for (GList *l = message->objects; l != NULL; l = l->next) {
         LibWCRelayMessageObject *object = l->data;
