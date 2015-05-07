@@ -25,8 +25,8 @@ GHashTable *cmd_identifiers;
 GHashTable *type_identifiers;
 
 typedef GVariant* (*LibWCObjectExtractor)(void**,
-										  const void*,
-										  GError**);
+                                          const void*,
+                                          GError**);
 
 #define GET_FIELD(data_, offset_, type_) (*((type_*)(&((gint8*)data_)[offset_])))
 
@@ -55,17 +55,17 @@ typedef GVariant* (*LibWCObjectExtractor)(void**,
 
 static inline gboolean
 check_msg_bounds(const void *pos,
-				 const void *end_ptr,
-				 goffset offset,
-				 GError **error) {
-	if (G_LIKELY(pos + offset <= end_ptr &&
-				 offset > 0))
-		return TRUE;
+                 const void *end_ptr,
+                 goffset offset,
+                 GError **error) {
+    if (G_LIKELY(pos + offset <= end_ptr &&
+                 offset > 0))
+        return TRUE;
 
-	g_set_error_literal(error, LIBWC_ERROR_RELAY,
-						LIBWC_ERROR_RELAY_UNEXPECTED_EOM,
-						"Message received from relay was shorter then expected");
-	return FALSE;
+    g_set_error_literal(error, LIBWC_ERROR_RELAY,
+                        LIBWC_ERROR_RELAY_UNEXPECTED_EOM,
+                        "Message received from relay was shorter then expected");
+    return FALSE;
 }
 
 static LibWCObjectExtractor
@@ -73,117 +73,117 @@ get_extractor_for_object_type(LibWCRelayObjectType type);
 
 static LibWCRelayObjectType
 get_object_type_from_string(const gchar *str,
-							GError **error) {
-	LibWCRelayObjectType type;
+                            GError **error) {
+    LibWCRelayObjectType type;
 
-	type = (LibWCRelayObjectType)g_hash_table_lookup(type_identifiers, str);
-	if (!type) {
-		gchar *data_type = g_strescape(str, NULL);
+    type = (LibWCRelayObjectType)g_hash_table_lookup(type_identifiers, str);
+    if (!type) {
+        gchar *data_type = g_strescape(str, NULL);
 
-		g_warn_if_reached();
-		g_set_error(error, LIBWC_ERROR_RELAY, LIBWC_ERROR_RELAY_INVALID_DATA,
-					"Unknown data type encountered: '%s'", data_type);
+        g_warn_if_reached();
+        g_set_error(error, LIBWC_ERROR_RELAY, LIBWC_ERROR_RELAY_INVALID_DATA,
+                    "Unknown data type encountered: '%s'", data_type);
 
-		g_free(data_type);
+        g_free(data_type);
 
-		return 0;
-	}
+        return 0;
+    }
 
-	return type;
+    return type;
 }
 
 static LibWCRelayObjectType
 extract_object_type(void **pos,
-					const void *end_ptr,
-					GError **error) {
-	LibWCRelayObjectType type;
-	gchar type_str[4] = {0};
+                    const void *end_ptr,
+                    GError **error) {
+    LibWCRelayObjectType type;
+    gchar type_str[4] = {0};
 
-	g_return_val_if_fail(check_msg_bounds(*pos, end_ptr, OBJECT_ID_LEN, error), 0);
+    g_return_val_if_fail(check_msg_bounds(*pos, end_ptr, OBJECT_ID_LEN, error), 0);
 
-	memcpy(type_str, *pos, OBJECT_ID_LEN);
-	*pos += OBJECT_ID_LEN;
+    memcpy(type_str, *pos, OBJECT_ID_LEN);
+    *pos += OBJECT_ID_LEN;
 
-	type = get_object_type_from_string(type_str, error);
-	if (!type)
-		return 0;
+    type = get_object_type_from_string(type_str, error);
+    if (!type)
+        return 0;
 
-	return type;
+    return type;
 }
 
 static gboolean
 extract_size(void **pos,
-			 const void *end_ptr,
-			 gsize size_len,
-			 gint32 *size,
-			 GError **error) {
-	g_return_val_if_fail(check_msg_bounds(*pos, end_ptr, size_len, error), FALSE);
+             const void *end_ptr,
+             gsize size_len,
+             gint32 *size,
+             GError **error) {
+    g_return_val_if_fail(check_msg_bounds(*pos, end_ptr, size_len, error), FALSE);
 
-	/* We're copying a big endian value, so we need to start from the end of the
-	 * integer, not the start
-	 */
-	memcpy((gchar*)size + (sizeof(gint32) - size_len), *pos, size_len);
-	*pos += size_len;
+    /* We're copying a big endian value, so we need to start from the end of the
+     * integer, not the start
+     */
+    memcpy((gchar*)size + (sizeof(gint32) - size_len), *pos, size_len);
+    *pos += size_len;
 
-	*size = GINT32_FROM_BE(*size);
+    *size = GINT32_FROM_BE(*size);
 
-	return TRUE;
+    return TRUE;
 }
 
 static inline gboolean
 object_type_is_primitive(LibWCRelayObjectType type) {
-	gboolean is_primitive;
+    gboolean is_primitive;
 
-	switch (type) {
-		case LIBWC_OBJECT_TYPE_CHAR:
-		case LIBWC_OBJECT_TYPE_INT:
-		case LIBWC_OBJECT_TYPE_LONG:
-		case LIBWC_OBJECT_TYPE_STRING:
-		case LIBWC_OBJECT_TYPE_BUFFER:
-		case LIBWC_OBJECT_TYPE_POINTER:
-		case LIBWC_OBJECT_TYPE_TIME:
-			is_primitive = TRUE;
-			break;
-		default:
-			is_primitive = FALSE;
-			break;
-	}
+    switch (type) {
+        case LIBWC_OBJECT_TYPE_CHAR:
+        case LIBWC_OBJECT_TYPE_INT:
+        case LIBWC_OBJECT_TYPE_LONG:
+        case LIBWC_OBJECT_TYPE_STRING:
+        case LIBWC_OBJECT_TYPE_BUFFER:
+        case LIBWC_OBJECT_TYPE_POINTER:
+        case LIBWC_OBJECT_TYPE_TIME:
+            is_primitive = TRUE;
+            break;
+        default:
+            is_primitive = FALSE;
+            break;
+    }
 
-	return is_primitive;
+    return is_primitive;
 } G_GNUC_PURE
 
 static const GVariantType*
 get_variant_type_for_primitive_object_type(LibWCRelayObjectType type) {
-	const GVariantType *variant_type;
+    const GVariantType *variant_type;
 
-	switch (type) {
-		case LIBWC_OBJECT_TYPE_CHAR:
-			variant_type = G_VARIANT_TYPE_BYTE;
-			break;
-		case LIBWC_OBJECT_TYPE_INT:
-			variant_type = G_VARIANT_TYPE_INT32;
-			break;
-		case LIBWC_OBJECT_TYPE_LONG:
-			variant_type = G_VARIANT_TYPE_INT64;
-			break;
-		case LIBWC_OBJECT_TYPE_STRING:
-			variant_type = OBJECT_STRING_VARIANT_TYPE;
-			break;
-		case LIBWC_OBJECT_TYPE_BUFFER:
-			variant_type = OBJECT_BUFFER_VARIANT_TYPE;
-			break;
-		case LIBWC_OBJECT_TYPE_POINTER:
-		case LIBWC_OBJECT_TYPE_TIME:
-			variant_type = G_VARIANT_TYPE_UINT64;
-			break;
-		default:
-			variant_type = NULL;
-			break;
-	}
+    switch (type) {
+        case LIBWC_OBJECT_TYPE_CHAR:
+            variant_type = G_VARIANT_TYPE_BYTE;
+            break;
+        case LIBWC_OBJECT_TYPE_INT:
+            variant_type = G_VARIANT_TYPE_INT32;
+            break;
+        case LIBWC_OBJECT_TYPE_LONG:
+            variant_type = G_VARIANT_TYPE_INT64;
+            break;
+        case LIBWC_OBJECT_TYPE_STRING:
+            variant_type = OBJECT_STRING_VARIANT_TYPE;
+            break;
+        case LIBWC_OBJECT_TYPE_BUFFER:
+            variant_type = OBJECT_BUFFER_VARIANT_TYPE;
+            break;
+        case LIBWC_OBJECT_TYPE_POINTER:
+        case LIBWC_OBJECT_TYPE_TIME:
+            variant_type = G_VARIANT_TYPE_UINT64;
+            break;
+        default:
+            variant_type = NULL;
+            break;
+    }
 
-	g_assert_nonnull(variant_type);
+    g_assert_nonnull(variant_type);
 
-	return variant_type;
+    return variant_type;
 }
 
 /* Used to read a string of data from a message. A string in a weechat message
@@ -192,48 +192,48 @@ get_variant_type_for_primitive_object_type(LibWCRelayObjectType type) {
  */
 static void *
 extract_string(void **pos,
-			   const void *end_ptr,
-			   gsize strlen_field_len,
-			   GError **error) {
-	gint32 len = 0;
-	void *str;
+               const void *end_ptr,
+               gsize strlen_field_len,
+               GError **error) {
+    gint32 len = 0;
+    void *str;
 
-	if (!extract_size(pos, end_ptr, strlen_field_len, &len, error))
-		return FALSE;
+    if (!extract_size(pos, end_ptr, strlen_field_len, &len, error))
+        return FALSE;
 
-	g_return_val_if_fail(check_msg_bounds(*pos, end_ptr, len, error), NULL);
+    g_return_val_if_fail(check_msg_bounds(*pos, end_ptr, len, error), NULL);
 
-	str = g_malloc0(len + 1);
-	memcpy(str, *pos, len);
-	*pos += len;
+    str = g_malloc0(len + 1);
+    memcpy(str, *pos, len);
+    *pos += len;
 
-	return str;
+    return str;
 }
 
 static GVariant *
 extract_normal_object(void **pos,
-					  const void *end_ptr,
-					  const GVariantType *value_type,
-					  gsize size,
-					  GDestroyNotify notify,
-					  GError **error) {
-	GVariant *object;
-	void *data;
+                      const void *end_ptr,
+                      const GVariantType *value_type,
+                      gsize size,
+                      GDestroyNotify notify,
+                      GError **error) {
+    GVariant *object;
+    void *data;
 
-	g_return_val_if_fail(check_msg_bounds(*pos, end_ptr, size, error), NULL);
+    g_return_val_if_fail(check_msg_bounds(*pos, end_ptr, size, error), NULL);
 
-	data = g_slice_copy(size, *pos);
-	object = g_variant_new_from_data(value_type, data, size, FALSE, notify,
-									 data);
-	*pos += size;
+    data = g_slice_copy(size, *pos);
+    object = g_variant_new_from_data(value_type, data, size, FALSE, notify,
+                                     data);
+    *pos += size;
 
 #if G_BYTE_ORDER == G_LITTLE_ENDIAN
-	/* On little endian systems we need to do a byteswap */
-	if (size > 1)
-		object = g_variant_byteswap(object);
+    /* On little endian systems we need to do a byteswap */
+    if (size > 1)
+        object = g_variant_byteswap(object);
 #endif
 
-	return object;
+    return object;
 }
 
 static void
@@ -241,10 +241,10 @@ free_char_object(void *mem) { g_slice_free(gchar, mem); }
 
 static GVariant *
 extract_char_object(void **pos,
-					const void *end_ptr,
-					GError **error) {
-	return extract_normal_object(pos, end_ptr, G_VARIANT_TYPE_BYTE,
-								 sizeof(gchar), free_char_object, error);
+                    const void *end_ptr,
+                    GError **error) {
+    return extract_normal_object(pos, end_ptr, G_VARIANT_TYPE_BYTE,
+                                 sizeof(gchar), free_char_object, error);
 }
 
 static void
@@ -252,707 +252,707 @@ free_int_object(void *mem) { g_slice_free(gint32, mem); }
 
 static GVariant *
 extract_int_object(void **pos,
-				   const void *end_ptr,
-				   GError **error) {
-	return extract_normal_object(pos, end_ptr, G_VARIANT_TYPE_INT32,
-								 sizeof(gint32), free_int_object, error);
+                   const void *end_ptr,
+                   GError **error) {
+    return extract_normal_object(pos, end_ptr, G_VARIANT_TYPE_INT32,
+                                 sizeof(gint32), free_int_object, error);
 }
 
 static GVariant *
 extract_long_object(void **pos,
-					const void *end_ptr,
-					GError **error) {
-	GVariant *object;
-	gchar *str;
-	glong value;
+                    const void *end_ptr,
+                    GError **error) {
+    GVariant *object;
+    gchar *str;
+    glong value;
 
-	str = extract_string(pos, end_ptr, OBJECT_LONG_LEN_LEN, error);
-	if (!str)
-		return NULL;
+    str = extract_string(pos, end_ptr, OBJECT_LONG_LEN_LEN, error);
+    if (!str)
+        return NULL;
 
-	value = strtol(str, NULL, 10);
-	if (value == 0 && (errno == EINVAL || errno == ERANGE)) {
-		g_warn_if_reached();
-		g_set_error(error, LIBWC_ERROR_RELAY, LIBWC_ERROR_RELAY_INVALID_DATA,
-					"Failed to parse object of type 'long': %s",
-					strerror(errno));
-		return NULL;
-	}
+    value = strtol(str, NULL, 10);
+    if (value == 0 && (errno == EINVAL || errno == ERANGE)) {
+        g_warn_if_reached();
+        g_set_error(error, LIBWC_ERROR_RELAY, LIBWC_ERROR_RELAY_INVALID_DATA,
+                    "Failed to parse object of type 'long': %s",
+                    strerror(errno));
+        return NULL;
+    }
 
-	g_free(str);
+    g_free(str);
 
-	object = g_variant_new_int64(value);
+    object = g_variant_new_int64(value);
 
-	return object;
+    return object;
 }
 
 static GVariant *
 extract_string_object(void **pos,
-					  const void *end_ptr,
-					  GError **error) {
-	GVariant *object, *maybe_container;
-	gchar *str;
-	gint32 len = 0;
+                      const void *end_ptr,
+                      GError **error) {
+    GVariant *object, *maybe_container;
+    gchar *str;
+    gint32 len = 0;
 
-	if (!extract_size(pos, end_ptr, OBJECT_STRING_LEN_LEN, &len, error))
-		return NULL;
+    if (!extract_size(pos, end_ptr, OBJECT_STRING_LEN_LEN, &len, error))
+        return NULL;
 
-	if (len == 0)
-		object = g_variant_new_string("");
-	else if (len == -1)
-		object = NULL;
-	else {
-		g_return_val_if_fail(check_msg_bounds(*pos, end_ptr, len, error), NULL);
+    if (len == 0)
+        object = g_variant_new_string("");
+    else if (len == -1)
+        object = NULL;
+    else {
+        g_return_val_if_fail(check_msg_bounds(*pos, end_ptr, len, error), NULL);
 
-		str = g_new0(gchar, len + 1);
-		memcpy(str, *pos, len);
+        str = g_new0(gchar, len + 1);
+        memcpy(str, *pos, len);
 
-		object = g_variant_new_take_string(str);
-		*pos += len;
-	}
+        object = g_variant_new_take_string(str);
+        *pos += len;
+    }
 
-	maybe_container = g_variant_new_maybe(G_VARIANT_TYPE_STRING, object);
+    maybe_container = g_variant_new_maybe(G_VARIANT_TYPE_STRING, object);
 
-	return maybe_container;
+    return maybe_container;
 }
 
 static GVariant *
 extract_buffer_object(void **pos,
-					  const void *end_ptr,
-					  GError **error) {
-	GVariant *object, *maybe_container;
-	void *data;
-	gint32 len = 0;
+                      const void *end_ptr,
+                      GError **error) {
+    GVariant *object, *maybe_container;
+    void *data;
+    gint32 len = 0;
 
-	if (!extract_size(pos, end_ptr, OBJECT_BUFFER_LEN_LEN, &len, error))
-		return NULL;
+    if (!extract_size(pos, end_ptr, OBJECT_BUFFER_LEN_LEN, &len, error))
+        return NULL;
 
-	if (len == 0)
-		object = g_variant_new_bytestring("");
-	else if (len == -1)
-		object = NULL;
-	else {
-		g_return_val_if_fail(check_msg_bounds(*pos, end_ptr, len, error), NULL);
+    if (len == 0)
+        object = g_variant_new_bytestring("");
+    else if (len == -1)
+        object = NULL;
+    else {
+        g_return_val_if_fail(check_msg_bounds(*pos, end_ptr, len, error), NULL);
 
-		data = g_memdup(*pos, len);
-		object =
-			g_variant_new_from_data(OBJECT_BUFFER_VARIANT_TYPE, data, len,
-									FALSE, g_free, data);
-		*pos += len;
-	}
+        data = g_memdup(*pos, len);
+        object =
+            g_variant_new_from_data(OBJECT_BUFFER_VARIANT_TYPE, data, len,
+                                    FALSE, g_free, data);
+        *pos += len;
+    }
 
-	maybe_container = g_variant_new_maybe(G_VARIANT_TYPE_BYTESTRING, object);
+    maybe_container = g_variant_new_maybe(G_VARIANT_TYPE_BYTESTRING, object);
 
-	return maybe_container;
+    return maybe_container;
 }
 
 static GVariant *
 extract_pointer_object(void **pos,
-					   const void *end_ptr,
-					   GError **error) {
-	GVariant *object;
-	guint64 value;
-	gint32 len = 0;
+                       const void *end_ptr,
+                       GError **error) {
+    GVariant *object;
+    guint64 value;
+    gint32 len = 0;
 
-	if (!extract_size(pos, end_ptr, OBJECT_POINTER_LEN_LEN, &len, error))
-		return NULL;
+    if (!extract_size(pos, end_ptr, OBJECT_POINTER_LEN_LEN, &len, error))
+        return NULL;
 
-	g_return_val_if_fail(check_msg_bounds(*pos, end_ptr, len, error), NULL);
+    g_return_val_if_fail(check_msg_bounds(*pos, end_ptr, len, error), NULL);
 
-	/* If we have a length of 01, and the next byte is 0, we have a NULL
-	 * pointer */
-	if (len == 1 && GET_FIELD(*pos, 1, guint8) == 0) {
-		object = g_variant_new_uint64(0);
-		*pos += 1;
-	}
-	else {
-		gchar str[len+1];
+    /* If we have a length of 01, and the next byte is 0, we have a NULL
+     * pointer */
+    if (len == 1 && GET_FIELD(*pos, 1, guint8) == 0) {
+        object = g_variant_new_uint64(0);
+        *pos += 1;
+    }
+    else {
+        gchar str[len+1];
 
-		memcpy(str, *pos, len);
+        memcpy(str, *pos, len);
 
-		/* Null terminate the end of the string */
-		str[len] = 0;
+        /* Null terminate the end of the string */
+        str[len] = 0;
 
-		value = strtoul(str, NULL, 16);
-		if (value == 0 && (errno == EINVAL || errno == ERANGE)) {
-			g_warn_if_reached();
-			g_set_error(error, LIBWC_ERROR_RELAY, LIBWC_ERROR_RELAY_INVALID_DATA,
-						"Failed to parse object of type 'pointer': %s",
-						strerror(errno));
-			return NULL;
-		}
+        value = strtoul(str, NULL, 16);
+        if (value == 0 && (errno == EINVAL || errno == ERANGE)) {
+            g_warn_if_reached();
+            g_set_error(error, LIBWC_ERROR_RELAY, LIBWC_ERROR_RELAY_INVALID_DATA,
+                        "Failed to parse object of type 'pointer': %s",
+                        strerror(errno));
+            return NULL;
+        }
 
-		object = g_variant_new_uint64(value);
-		*pos += len;
-	}
+        object = g_variant_new_uint64(value);
+        *pos += len;
+    }
 
-	return object;
+    return object;
 }
 
 static GVariant *
 extract_time_object(void **pos,
-					const void *end_ptr,
-					GError **error) {
-	GVariant *object;
-	gchar *str;
-	guint64 value;
-	gsize len = 0;
+                    const void *end_ptr,
+                    GError **error) {
+    GVariant *object;
+    gchar *str;
+    guint64 value;
+    gsize len = 0;
 
-	str = extract_string(pos, end_ptr, OBJECT_TIME_LEN_LEN, error);
-	if (!str)
-		return NULL;
+    str = extract_string(pos, end_ptr, OBJECT_TIME_LEN_LEN, error);
+    if (!str)
+        return NULL;
 
-	value = strtoul(str, NULL, 10);
-	if (value == 0 && (errno == EINVAL || errno == ERANGE)) {
-		g_warn_if_reached();
-		g_set_error(error, LIBWC_ERROR_RELAY, LIBWC_ERROR_RELAY_INVALID_DATA,
-					"Failed to parse object of type 'time': %s",
-					strerror(errno));
-		return NULL;
-	}
+    value = strtoul(str, NULL, 10);
+    if (value == 0 && (errno == EINVAL || errno == ERANGE)) {
+        g_warn_if_reached();
+        g_set_error(error, LIBWC_ERROR_RELAY, LIBWC_ERROR_RELAY_INVALID_DATA,
+                    "Failed to parse object of type 'time': %s",
+                    strerror(errno));
+        return NULL;
+    }
 
-	g_free(str);
+    g_free(str);
 
-	object = g_variant_new_uint64(value);
+    object = g_variant_new_uint64(value);
 
-	return object;
+    return object;
 }
 
 static GVariant *
 extract_array_object(void **pos,
-					 const void *end_ptr,
-					 GError **error) {
-	GVariant *variant,
-	         **array_contents, **tuple_contents;
-	LibWCRelayObjectType object_type;
-	const GVariantType* variant_type;
-	LibWCObjectExtractor element_extractor;
-	gint32 count = 0;
+                     const void *end_ptr,
+                     GError **error) {
+    GVariant *variant,
+             **array_contents, **tuple_contents;
+    LibWCRelayObjectType object_type;
+    const GVariantType* variant_type;
+    LibWCObjectExtractor element_extractor;
+    gint32 count = 0;
 
-	object_type = extract_object_type(pos, end_ptr, error);
-	if (!object_type)
-		return NULL;
-	g_return_val_if_fail(object_type_is_primitive(object_type), NULL);
+    object_type = extract_object_type(pos, end_ptr, error);
+    if (!object_type)
+        return NULL;
+    g_return_val_if_fail(object_type_is_primitive(object_type), NULL);
 
-	if (!extract_size(pos, end_ptr, OBJECT_ARRAY_LEN_LEN, &count, error))
-		return NULL;
+    if (!extract_size(pos, end_ptr, OBJECT_ARRAY_LEN_LEN, &count, error))
+        return NULL;
 
-	element_extractor = get_extractor_for_object_type(object_type);
-	array_contents = g_new0(GVariant*, count);
+    element_extractor = get_extractor_for_object_type(object_type);
+    array_contents = g_new0(GVariant*, count);
 
-	for (int i = 0; i < count; i++) {
-		array_contents[i] = element_extractor(pos, end_ptr, error);
-		if (!array_contents[i]) {
-			for (int i = 0; i < count || array_contents[i] == NULL; i++)
-				g_variant_unref(array_contents[i]);
+    for (int i = 0; i < count; i++) {
+        array_contents[i] = element_extractor(pos, end_ptr, error);
+        if (!array_contents[i]) {
+            for (int i = 0; i < count || array_contents[i] == NULL; i++)
+                g_variant_unref(array_contents[i]);
 
-			return NULL;
-		}
-	}
+            return NULL;
+        }
+    }
 
-	variant_type = get_variant_type_for_primitive_object_type(object_type);
+    variant_type = get_variant_type_for_primitive_object_type(object_type);
 
-	tuple_contents = (GVariant*[]) {
-		g_variant_new_byte(object_type),
-		g_variant_new_array(variant_type, array_contents, count)
-	};
-	variant = g_variant_new_tuple(tuple_contents, 2);
+    tuple_contents = (GVariant*[]) {
+        g_variant_new_byte(object_type),
+        g_variant_new_array(variant_type, array_contents, count)
+    };
+    variant = g_variant_new_tuple(tuple_contents, 2);
 
-	g_free(array_contents);
+    g_free(array_contents);
 
-	return variant;
+    return variant;
 }
 
 static GVariant *
 extract_hashtable_object(void **pos,
-						 const void *end_ptr,
-						 GError **error)
+                         const void *end_ptr,
+                         GError **error)
 {
-	GVariant *variant,
-			 *key, *value;
-	GVariant **entries = NULL;
-	LibWCRelayObjectType key_type, value_type;
-	LibWCObjectExtractor key_extractor, value_extractor;
-	gint32 count;
+    GVariant *variant,
+             *key, *value;
+    GVariant **entries = NULL;
+    LibWCRelayObjectType key_type, value_type;
+    LibWCObjectExtractor key_extractor, value_extractor;
+    gint32 count;
 
-	key_type = extract_object_type(pos, end_ptr, error);
-	if (!key_type)
-		return NULL;
-	g_return_val_if_fail(object_type_is_primitive(key_type), NULL);
+    key_type = extract_object_type(pos, end_ptr, error);
+    if (!key_type)
+        return NULL;
+    g_return_val_if_fail(object_type_is_primitive(key_type), NULL);
 
-	value_type = extract_object_type(pos, end_ptr, error);
-	if (!value_type)
-		return NULL;
-	g_return_val_if_fail(object_type_is_primitive(value_type), NULL);
+    value_type = extract_object_type(pos, end_ptr, error);
+    if (!value_type)
+        return NULL;
+    g_return_val_if_fail(object_type_is_primitive(value_type), NULL);
 
-	if (!extract_size(pos, end_ptr, OBJECT_HASHTABLE_LEN_LEN, &count, error))
-		return NULL;
+    if (!extract_size(pos, end_ptr, OBJECT_HASHTABLE_LEN_LEN, &count, error))
+        return NULL;
 
-	key_extractor = get_extractor_for_object_type(key_type);
-	value_extractor = get_extractor_for_object_type(value_type);
+    key_extractor = get_extractor_for_object_type(key_type);
+    value_extractor = get_extractor_for_object_type(value_type);
 
-	entries = g_new0(GVariant*, count);
+    entries = g_new0(GVariant*, count);
 
-	for (int i = 0; i < count; i++) {
-		key = key_extractor(pos, end_ptr, error);
-		if (!key)
-			goto extract_hashtable_object_error;
+    for (int i = 0; i < count; i++) {
+        key = key_extractor(pos, end_ptr, error);
+        if (!key)
+            goto extract_hashtable_object_error;
 
-		value = value_extractor(pos, end_ptr, error);
-		if (!value) {
-			g_variant_unref(key);
-			goto extract_hashtable_object_error;
-		}
+        value = value_extractor(pos, end_ptr, error);
+        if (!value) {
+            g_variant_unref(key);
+            goto extract_hashtable_object_error;
+        }
 
-		entries[i] = g_variant_new_tuple((GVariant*[]) { key, value }, 2);
-	}
+        entries[i] = g_variant_new_tuple((GVariant*[]) { key, value }, 2);
+    }
 
-	variant = g_variant_new_tuple(
-		(GVariant*[]) {
-			g_variant_new_byte(key_type),
-			g_variant_new_byte(value_type),
-			g_variant_new_array(G_VARIANT_TYPE_TUPLE, entries, count)
-		}, 3);
+    variant = g_variant_new_tuple(
+        (GVariant*[]) {
+            g_variant_new_byte(key_type),
+            g_variant_new_byte(value_type),
+            g_variant_new_array(G_VARIANT_TYPE_TUPLE, entries, count)
+        }, 3);
 
-	g_free(entries);
+    g_free(entries);
 
-	return variant;
+    return variant;
 
 extract_hashtable_object_error:
-	if (entries) {
-		for (int i = 0; i < count && entries[i] != NULL; i++)
-			g_variant_unref(entries[i]);
+    if (entries) {
+        for (int i = 0; i < count && entries[i] != NULL; i++)
+            g_variant_unref(entries[i]);
 
-		g_free(entries);
-	}
+        g_free(entries);
+    }
 
-	return NULL;
+    return NULL;
 }
 
 static GVariant *
 extract_hdata_object(void **pos,
-					 const void *end_ptr,
-					 GError **error) {
-	GVariant *variant = NULL;
-	GVariant **hdata_items = NULL,
-			 **key_info_variants, **hpath_name_variants;
-	const GVariantType *key_info_variant_type;
-	gchar *hpath = NULL,
-	      *key_string = NULL;
-	gchar **hpath_names = NULL, **key_names = NULL;
-	gsize hpath_count, key_count;
-	gint32 count;
-	struct {
-		gchar *name;
-		LibWCRelayObjectType type;
-	} *key_info;
+                     const void *end_ptr,
+                     GError **error) {
+    GVariant *variant = NULL;
+    GVariant **hdata_items = NULL,
+             **key_info_variants, **hpath_name_variants;
+    const GVariantType *key_info_variant_type;
+    gchar *hpath = NULL,
+          *key_string = NULL;
+    gchar **hpath_names = NULL, **key_names = NULL;
+    gsize hpath_count, key_count;
+    gint32 count;
+    struct {
+        gchar *name;
+        LibWCRelayObjectType type;
+    } *key_info;
 
-	hpath = extract_string(pos, end_ptr, OBJECT_HDATA_HPATH_LEN_LEN, error);
-	if (!hpath)
-		return NULL;
+    hpath = extract_string(pos, end_ptr, OBJECT_HDATA_HPATH_LEN_LEN, error);
+    if (!hpath)
+        return NULL;
 
-	hpath_names = g_strsplit(hpath, "/", -1);
-	hpath_count = g_strv_length(hpath_names);
+    hpath_names = g_strsplit(hpath, "/", -1);
+    hpath_count = g_strv_length(hpath_names);
 
-	/* Extract the type information for each of the keys. Since we can expect
-	 * all of the values in each hdata item to be in order, it's easier to do
-	 * this in an array */
-	key_string = extract_string(pos, end_ptr, OBJECT_HDATA_KEY_STRING_LEN_LEN,
-								error);
-	if (!key_string)
-		goto extract_hdata_object_error;
+    /* Extract the type information for each of the keys. Since we can expect
+     * all of the values in each hdata item to be in order, it's easier to do
+     * this in an array */
+    key_string = extract_string(pos, end_ptr, OBJECT_HDATA_KEY_STRING_LEN_LEN,
+                                error);
+    if (!key_string)
+        goto extract_hdata_object_error;
 
-	key_names = g_strsplit(key_string, ",", -1);
-	key_count = g_strv_length(key_names);
+    key_names = g_strsplit(key_string, ",", -1);
+    key_count = g_strv_length(key_names);
 
-	key_info = g_malloc0(sizeof(*key_info) * key_count);
+    key_info = g_malloc0(sizeof(*key_info) * key_count);
 
-	/* Convert the string containing the key names and their types into the
-	 * key_info struct we defined earlier, this makes looking up the data type
-	 * for each key much faster and easier */
-	for (int i = 0; key_names[i] != NULL; i++) {
-		gchar **split_str = g_strsplit(key_names[i], ":", 2);
+    /* Convert the string containing the key names and their types into the
+     * key_info struct we defined earlier, this makes looking up the data type
+     * for each key much faster and easier */
+    for (int i = 0; key_names[i] != NULL; i++) {
+        gchar **split_str = g_strsplit(key_names[i], ":", 2);
 
-		if (g_strv_length(split_str) < 2) {
-			gchar *key_type = g_strescape(key_names[i], NULL);
+        if (g_strv_length(split_str) < 2) {
+            gchar *key_type = g_strescape(key_names[i], NULL);
 
-			g_warn_if_reached();
+            g_warn_if_reached();
 
-			g_set_error(error, LIBWC_ERROR_RELAY, LIBWC_ERROR_RELAY_INVALID_DATA,
-						"Invalid key:datatype specification in hdata: \"%s\"",
-						key_type);
+            g_set_error(error, LIBWC_ERROR_RELAY, LIBWC_ERROR_RELAY_INVALID_DATA,
+                        "Invalid key:datatype specification in hdata: \"%s\"",
+                        key_type);
 
-			g_strfreev(split_str);
-			g_free(key_type);
+            g_strfreev(split_str);
+            g_free(key_type);
 
-			goto extract_hdata_object_error;
-		}
+            goto extract_hdata_object_error;
+        }
 
-		key_info[i].type = get_object_type_from_string(split_str[1], error);
+        key_info[i].type = get_object_type_from_string(split_str[1], error);
 
-		if (!key_info[i].type) {
-			g_strfreev(split_str);
-			goto extract_hdata_object_error;
-		}
+        if (!key_info[i].type) {
+            g_strfreev(split_str);
+            goto extract_hdata_object_error;
+        }
 
-		key_info[i].name = split_str[0];
-		split_str[0] = NULL;
+        key_info[i].name = split_str[0];
+        split_str[0] = NULL;
 
-		g_strfreev(split_str);
-	}
+        g_strfreev(split_str);
+    }
 
-	if (!extract_size(pos, end_ptr, OBJECT_HDATA_LEN_LEN, &count, error))
-		goto extract_hdata_object_error;
+    if (!extract_size(pos, end_ptr, OBJECT_HDATA_LEN_LEN, &count, error))
+        goto extract_hdata_object_error;
 
-	hdata_items = g_new0(GVariant*, count);
+    hdata_items = g_new0(GVariant*, count);
 
-	/* Actually parse all of the hdata objects */
-	for (int i = 0; i < count; i++) {
-		GVariantDict *p_path, *keys;
-		LibWCObjectExtractor value_extractor;
-		GVariant *value;
+    /* Actually parse all of the hdata objects */
+    for (int i = 0; i < count; i++) {
+        GVariantDict *p_path, *keys;
+        LibWCObjectExtractor value_extractor;
+        GVariant *value;
 
-		/* First comes the p-path objects */
-		p_path = g_variant_dict_new(NULL);
-		for (int j = 0; j < hpath_count; j++) {
-			value = extract_pointer_object(pos, end_ptr, error);
-			if (!value) {
-				g_variant_dict_unref(p_path);
-				goto extract_hdata_object_error;
-			}
+        /* First comes the p-path objects */
+        p_path = g_variant_dict_new(NULL);
+        for (int j = 0; j < hpath_count; j++) {
+            value = extract_pointer_object(pos, end_ptr, error);
+            if (!value) {
+                g_variant_dict_unref(p_path);
+                goto extract_hdata_object_error;
+            }
 
-			g_variant_dict_insert_value(p_path, hpath_names[j], value);
-		}
+            g_variant_dict_insert_value(p_path, hpath_names[j], value);
+        }
 
-		/* Next comes the actual objects */
-		keys = g_variant_dict_new(NULL);
-		for (int j = 0; j < key_count; j++) {
-			value_extractor = get_extractor_for_object_type(key_info[j].type);
+        /* Next comes the actual objects */
+        keys = g_variant_dict_new(NULL);
+        for (int j = 0; j < key_count; j++) {
+            value_extractor = get_extractor_for_object_type(key_info[j].type);
 
-			value = value_extractor(pos, end_ptr, error);
-			if (!value) {
-				g_variant_dict_unref(p_path);
-				g_variant_dict_unref(keys);
-				goto extract_hdata_object_error;
-			}
+            value = value_extractor(pos, end_ptr, error);
+            if (!value) {
+                g_variant_dict_unref(p_path);
+                g_variant_dict_unref(keys);
+                goto extract_hdata_object_error;
+            }
 
-			g_variant_dict_insert_value(keys, key_info[j].name, value);
-		}
+            g_variant_dict_insert_value(keys, key_info[j].name, value);
+        }
 
-		/* Pack them in a tuple, inside a variant container. We use the extra
-		 * container so that the type remains fixed, so we can later put them in
-		 * an array */
-		hdata_items[i] = g_variant_new_variant(
-			g_variant_new_tuple((GVariant*[]) {
-				g_variant_dict_end(p_path),
-				g_variant_dict_end(keys)
-			}, 2)
-		);
-	}
+        /* Pack them in a tuple, inside a variant container. We use the extra
+         * container so that the type remains fixed, so we can later put them in
+         * an array */
+        hdata_items[i] = g_variant_new_variant(
+            g_variant_new_tuple((GVariant*[]) {
+                g_variant_dict_end(p_path),
+                g_variant_dict_end(keys)
+            }, 2)
+        );
+    }
 
-	hpath_name_variants = g_new(GVariant*, hpath_count);
-	for (int i = 0; i < hpath_count; i++)
-	   	hpath_name_variants[i] = g_variant_new_take_string(hpath_names[i]);
+    hpath_name_variants = g_new(GVariant*, hpath_count);
+    for (int i = 0; i < hpath_count; i++)
+           hpath_name_variants[i] = g_variant_new_take_string(hpath_names[i]);
 
-	/* Take the key_info struct we made before, and convert it into an array we
-	 * pack with the hdata struct to provide a description of it's layout */
-	key_info_variants = g_new(GVariant*, key_count);
-	for (int i = 0; i < key_count; i++) {
-		key_info_variants[i] = g_variant_new_tuple(
-			(GVariant*[]) {
-				g_variant_new_take_string(key_info[i].name),
-				g_variant_new_byte(key_info[i].type)
-			}, 2);
-	}
+    /* Take the key_info struct we made before, and convert it into an array we
+     * pack with the hdata struct to provide a description of it's layout */
+    key_info_variants = g_new(GVariant*, key_count);
+    for (int i = 0; i < key_count; i++) {
+        key_info_variants[i] = g_variant_new_tuple(
+            (GVariant*[]) {
+                g_variant_new_take_string(key_info[i].name),
+                g_variant_new_byte(key_info[i].type)
+            }, 2);
+    }
 
-	key_info_variant_type = g_variant_get_type(key_info_variants[0]);
+    key_info_variant_type = g_variant_get_type(key_info_variants[0]);
 
-	/* Finally pack everything in a variant that we can return */
-	variant = g_variant_new_tuple(
-		(GVariant*[]) {
-			g_variant_new_array(G_VARIANT_TYPE_STRING, hpath_name_variants,
-								hpath_count),
-			g_variant_new_array(key_info_variant_type, key_info_variants,
-								key_count),
-			g_variant_new_array(G_VARIANT_TYPE_VARIANT, hdata_items, count)
-		}, 3);
+    /* Finally pack everything in a variant that we can return */
+    variant = g_variant_new_tuple(
+        (GVariant*[]) {
+            g_variant_new_array(G_VARIANT_TYPE_STRING, hpath_name_variants,
+                                hpath_count),
+            g_variant_new_array(key_info_variant_type, key_info_variants,
+                                key_count),
+            g_variant_new_array(G_VARIANT_TYPE_VARIANT, hdata_items, count)
+        }, 3);
 
-	g_free(hpath);
-	g_free(key_string);
-	/* We don't need to worry about freeing the elements in any of these
-	 * variables, at this point all of them have been taken by a GVariant of
-	 * some sort */
-	g_free(hpath_names);
-	g_free(key_names);
-	g_free(key_info);
-	g_free(hpath_name_variants);
-	g_free(key_info_variants);
-	g_free(hdata_items);
+    g_free(hpath);
+    g_free(key_string);
+    /* We don't need to worry about freeing the elements in any of these
+     * variables, at this point all of them have been taken by a GVariant of
+     * some sort */
+    g_free(hpath_names);
+    g_free(key_names);
+    g_free(key_info);
+    g_free(hpath_name_variants);
+    g_free(key_info_variants);
+    g_free(hdata_items);
 
-	return variant;
+    return variant;
 
 extract_hdata_object_error:
-	g_strfreev(hpath_names);
-	g_strfreev(key_names);
+    g_strfreev(hpath_names);
+    g_strfreev(key_names);
 
-	g_free(hpath);
-	g_free(key_string);
-	g_free(key_info);
+    g_free(hpath);
+    g_free(key_string);
+    g_free(key_info);
 
-	if (hdata_items) {
-		for (int i = 0; i < count && hdata_items[i] != NULL; i++)
-			g_variant_unref(hdata_items[i]);
+    if (hdata_items) {
+        for (int i = 0; i < count && hdata_items[i] != NULL; i++)
+            g_variant_unref(hdata_items[i]);
 
-		g_free(hdata_items);
-	}
+        g_free(hdata_items);
+    }
 
-	return NULL;
+    return NULL;
 }
 
 static GVariant *
 extract_info_object(void **pos,
-					const void *end_ptr,
-					GError **error) {
-	GVariant *variant, *name, *value;
+                    const void *end_ptr,
+                    GError **error) {
+    GVariant *variant, *name, *value;
 
-	name = extract_string_object(pos, end_ptr, error);
-	if (!name)
-		return NULL;
+    name = extract_string_object(pos, end_ptr, error);
+    if (!name)
+        return NULL;
 
-	value = extract_string_object(pos, end_ptr, error);
-	if (!value)
-		return NULL;
+    value = extract_string_object(pos, end_ptr, error);
+    if (!value)
+        return NULL;
 
-	variant = g_variant_new_tuple((GVariant*[]) { name, value }, 2);
+    variant = g_variant_new_tuple((GVariant*[]) { name, value }, 2);
 
-	return variant;
+    return variant;
 }
 
 static GVariant *
 extract_infolist_object(void **pos,
-						const void *end_ptr,
-						GError **error) {
-	GVariant *variant,
-	         *name = NULL,
-	         *item_name = NULL,
-	         **items = NULL,
-			 **variables = NULL;
-	gint32 count, variable_count;
-	gsize variable_array_size = 0;
+                        const void *end_ptr,
+                        GError **error) {
+    GVariant *variant,
+             *name = NULL,
+             *item_name = NULL,
+             **items = NULL,
+             **variables = NULL;
+    gint32 count, variable_count;
+    gsize variable_array_size = 0;
 
-	name = extract_string_object(pos, end_ptr, error);
-	if (!name)
-		goto extract_infolist_object_error;
+    name = extract_string_object(pos, end_ptr, error);
+    if (!name)
+        goto extract_infolist_object_error;
 
-	if (!extract_size(pos, end_ptr, OBJECT_INFOLIST_LEN_LEN, &count, error))
-		goto extract_infolist_object_error;
+    if (!extract_size(pos, end_ptr, OBJECT_INFOLIST_LEN_LEN, &count, error))
+        goto extract_infolist_object_error;
 
-	items = g_new0(GVariant*, count);
+    items = g_new0(GVariant*, count);
 
-	for (int i = 0; i < count; i++) {
-		if (!extract_size(pos, end_ptr, OBJECT_INFOLIST_LEN_LEN, &variable_count,
-						  error))
-			goto extract_infolist_object_error;
+    for (int i = 0; i < count; i++) {
+        if (!extract_size(pos, end_ptr, OBJECT_INFOLIST_LEN_LEN, &variable_count,
+                          error))
+            goto extract_infolist_object_error;
 
-		/* We avoid reallocating the variables struct every time we loop by just
-		 * making it larger if we need more room in it */
-		if (variable_array_size < variable_count) {
-			variables = g_renew(GVariant*, variables, variable_count);
-			memset(variables, '\0', variable_count);
-		}
+        /* We avoid reallocating the variables struct every time we loop by just
+         * making it larger if we need more room in it */
+        if (variable_array_size < variable_count) {
+            variables = g_renew(GVariant*, variables, variable_count);
+            memset(variables, '\0', variable_count);
+        }
 
-		for (int i = 0; i < variable_count; i++) {
-			LibWCRelayObjectType type;
-			LibWCObjectExtractor extractor;
-			GVariant *value;
+        for (int i = 0; i < variable_count; i++) {
+            LibWCRelayObjectType type;
+            LibWCObjectExtractor extractor;
+            GVariant *value;
 
-			item_name = extract_string_object(pos, end_ptr, error);
-			if (!item_name)
-				goto extract_infolist_object_error;
+            item_name = extract_string_object(pos, end_ptr, error);
+            if (!item_name)
+                goto extract_infolist_object_error;
 
-			type = extract_object_type(pos, end_ptr, error);
-			if (!type)
-				goto extract_infolist_object_error;
+            type = extract_object_type(pos, end_ptr, error);
+            if (!type)
+                goto extract_infolist_object_error;
 
-			extractor = get_extractor_for_object_type(type);
+            extractor = get_extractor_for_object_type(type);
 
-			value = extractor(pos, end_ptr, error);
-			if (!value)
-				goto extract_infolist_object_error;
+            value = extractor(pos, end_ptr, error);
+            if (!value)
+                goto extract_infolist_object_error;
 
-			variables[i] = g_variant_new_variant(
-				g_variant_new_tuple((GVariant*[]) {
-					item_name,
-					g_variant_new_byte(type),
-					value
-				}, 3));
-		}
+            variables[i] = g_variant_new_variant(
+                g_variant_new_tuple((GVariant*[]) {
+                    item_name,
+                    g_variant_new_byte(type),
+                    value
+                }, 3));
+        }
 
-		items[i] = g_variant_new_array(G_VARIANT_TYPE_VARIANT, variables,
-									   variable_count);
-	}
+        items[i] = g_variant_new_array(G_VARIANT_TYPE_VARIANT, variables,
+                                       variable_count);
+    }
 
-	variant = g_variant_new_tuple(
-		(GVariant*[]) {
-			name,
-			g_variant_new_array(g_variant_get_type(items[0]), items, count)
-		}, 2);
+    variant = g_variant_new_tuple(
+        (GVariant*[]) {
+            name,
+            g_variant_new_array(g_variant_get_type(items[0]), items, count)
+        }, 2);
 
-	g_free(items);
-	g_free(variables);
+    g_free(items);
+    g_free(variables);
 
-	return variant;
+    return variant;
 
 extract_infolist_object_error:
-	if (name)
-		g_variant_unref(name);
-	if (item_name)
-		g_variant_unref(item_name);
+    if (name)
+        g_variant_unref(name);
+    if (item_name)
+        g_variant_unref(item_name);
 
-	if (items) {
-		for (int i = 0; i < count && items[i] != NULL; i++)
-			g_variant_unref(items[i]);
+    if (items) {
+        for (int i = 0; i < count && items[i] != NULL; i++)
+            g_variant_unref(items[i]);
 
-		g_free(items);
-	}
+        g_free(items);
+    }
 
-	if (variables) {
-		for (int i = 0; i < variable_count && variables[i] != NULL; i++)
-			g_variant_unref(variables[i]);
+    if (variables) {
+        for (int i = 0; i < variable_count && variables[i] != NULL; i++)
+            g_variant_unref(variables[i]);
 
-		g_free(variables);
-	}
+        g_free(variables);
+    }
 
-	return NULL;
+    return NULL;
 }
 
 static LibWCObjectExtractor
 get_extractor_for_object_type(LibWCRelayObjectType type) {
-	LibWCObjectExtractor extractor;
+    LibWCObjectExtractor extractor;
 
-	switch(type) {
-		case LIBWC_OBJECT_TYPE_CHAR:
-			extractor = extract_char_object;
-			break;
-		case LIBWC_OBJECT_TYPE_INT:
-			extractor = extract_int_object;
-			break;
-		case LIBWC_OBJECT_TYPE_LONG:
-			extractor = extract_long_object;
-			break;
-		case LIBWC_OBJECT_TYPE_STRING:
-			extractor = extract_string_object;
-			break;
-		case LIBWC_OBJECT_TYPE_BUFFER:
-			extractor = extract_buffer_object;
-			break;
-		case LIBWC_OBJECT_TYPE_POINTER:
-			extractor = extract_pointer_object;
-			break;
-		case LIBWC_OBJECT_TYPE_TIME:
-			extractor = extract_time_object;
-			break;
-		case LIBWC_OBJECT_TYPE_HASHTABLE:
-			extractor = extract_hashtable_object;
-			break;
-		case LIBWC_OBJECT_TYPE_HDATA:
-			extractor = extract_hdata_object;
-			break;
-		case LIBWC_OBJECT_TYPE_INFO:
-			extractor = extract_info_object;
-			break;
-		case LIBWC_OBJECT_TYPE_INFOLIST:
-			extractor = extract_infolist_object;
-			break;
-		case LIBWC_OBJECT_TYPE_ARRAY:
-			extractor = extract_array_object;
-			break;
-		default:
-			extractor = NULL;
-			break;
-	}
+    switch(type) {
+        case LIBWC_OBJECT_TYPE_CHAR:
+            extractor = extract_char_object;
+            break;
+        case LIBWC_OBJECT_TYPE_INT:
+            extractor = extract_int_object;
+            break;
+        case LIBWC_OBJECT_TYPE_LONG:
+            extractor = extract_long_object;
+            break;
+        case LIBWC_OBJECT_TYPE_STRING:
+            extractor = extract_string_object;
+            break;
+        case LIBWC_OBJECT_TYPE_BUFFER:
+            extractor = extract_buffer_object;
+            break;
+        case LIBWC_OBJECT_TYPE_POINTER:
+            extractor = extract_pointer_object;
+            break;
+        case LIBWC_OBJECT_TYPE_TIME:
+            extractor = extract_time_object;
+            break;
+        case LIBWC_OBJECT_TYPE_HASHTABLE:
+            extractor = extract_hashtable_object;
+            break;
+        case LIBWC_OBJECT_TYPE_HDATA:
+            extractor = extract_hdata_object;
+            break;
+        case LIBWC_OBJECT_TYPE_INFO:
+            extractor = extract_info_object;
+            break;
+        case LIBWC_OBJECT_TYPE_INFOLIST:
+            extractor = extract_infolist_object;
+            break;
+        case LIBWC_OBJECT_TYPE_ARRAY:
+            extractor = extract_array_object;
+            break;
+        default:
+            extractor = NULL;
+            break;
+    }
 
-	return extractor;
+    return extractor;
 } G_GNUC_PURE
 
 static LibWCRelayMessageObject *
 extract_object(void **pos,
-			   const void *end_ptr,
-			   GError **error) {
-	GVariant *variant;
-	LibWCRelayMessageObject *object;
-	LibWCObjectExtractor extractor;
-	LibWCRelayObjectType type;
+               const void *end_ptr,
+               GError **error) {
+    GVariant *variant;
+    LibWCRelayMessageObject *object;
+    LibWCObjectExtractor extractor;
+    LibWCRelayObjectType type;
 
-	type = extract_object_type(pos, end_ptr, error);
-	if (!type)
-		return NULL;
+    type = extract_object_type(pos, end_ptr, error);
+    if (!type)
+        return NULL;
 
-	extractor = get_extractor_for_object_type(type);
-	variant = extractor(pos, end_ptr, error);
-	if (!variant)
-		return NULL;
+    extractor = get_extractor_for_object_type(type);
+    variant = extractor(pos, end_ptr, error);
+    if (!variant)
+        return NULL;
 
-	object = g_slice_alloc(sizeof(object));
-	object->type = type;
-	object->value = variant;
+    object = g_slice_alloc(sizeof(object));
+    object->type = type;
+    object->value = variant;
 
-	return object;
+    return object;
 }
 
 static GList *
 extract_objects(void **pos,
-				const void *end_ptr,
-				GError **error) {
-	LibWCRelayMessageObject *object;
-	GList *objects = NULL;
+                const void *end_ptr,
+                GError **error) {
+    LibWCRelayMessageObject *object;
+    GList *objects = NULL;
 
-	while (*pos < end_ptr) {
-		object = extract_object(pos, end_ptr, error);
-		if (!object)
-			goto extract_objects_error;
+    while (*pos < end_ptr) {
+        object = extract_object(pos, end_ptr, error);
+        if (!object)
+            goto extract_objects_error;
 
-		objects = g_list_prepend(objects, object);
-	}
+        objects = g_list_prepend(objects, object);
+    }
 
-	objects = g_list_reverse(objects);
+    objects = g_list_reverse(objects);
 
-	return objects;
+    return objects;
 
 extract_objects_error:
-	if (objects) {
-		for (GList *l = objects; l != NULL; l = l->next)
-			g_variant_unref(l->data);
-	}
-	g_warn_if_reached();
+    if (objects) {
+        for (GList *l = objects; l != NULL; l = l->next)
+            g_variant_unref(l->data);
+    }
+    g_warn_if_reached();
 
-	return NULL;
+    return NULL;
 }
 
 LibWCRelayMessage *
 libwc_relay_message_parse_data(void *data,
-							   gsize size,
-							   GError **error) {
-	LibWCRelayMessage *message = g_new(LibWCRelayMessage, 1);
+                               gsize size,
+                               GError **error) {
+    LibWCRelayMessage *message = g_new(LibWCRelayMessage, 1);
 
-	message->id = 0;
-	message->objects = extract_objects(&data, data + size, error);
+    message->id = 0;
+    message->objects = extract_objects(&data, data + size, error);
 
-	if (!message->objects)
-		goto libwc_relay_message_parse_data_error;
+    if (!message->objects)
+        goto libwc_relay_message_parse_data_error;
 
-	return message;
+    return message;
 
 libwc_relay_message_parse_data_error:
-	g_free(message);
+    g_free(message);
 
-	return NULL;
+    return NULL;
 }
 
 static inline void
 init_object_type(gchar *str,
-				 LibWCRelayObjectType type) {
-	g_hash_table_insert(type_identifiers, str, GINT_TO_POINTER(type));
+                 LibWCRelayObjectType type) {
+    g_hash_table_insert(type_identifiers, str, GINT_TO_POINTER(type));
 }
 
 void
@@ -960,19 +960,19 @@ _libwc_init_msg_parser() LIBWC_CONSTRUCTOR;
 
 void
 _libwc_init_msg_parser() {
-	cmd_identifiers = g_hash_table_new(g_str_hash, g_str_equal);
-	type_identifiers = g_hash_table_new(g_str_hash, g_str_equal);
+    cmd_identifiers = g_hash_table_new(g_str_hash, g_str_equal);
+    type_identifiers = g_hash_table_new(g_str_hash, g_str_equal);
 
-	init_object_type("chr", LIBWC_OBJECT_TYPE_CHAR);
-	init_object_type("int", LIBWC_OBJECT_TYPE_INT);
-	init_object_type("lon", LIBWC_OBJECT_TYPE_LONG);
-	init_object_type("str", LIBWC_OBJECT_TYPE_STRING);
-	init_object_type("buf", LIBWC_OBJECT_TYPE_BUFFER);
-	init_object_type("ptr", LIBWC_OBJECT_TYPE_POINTER);
-	init_object_type("tim", LIBWC_OBJECT_TYPE_TIME);
-	init_object_type("htb", LIBWC_OBJECT_TYPE_HASHTABLE);
-	init_object_type("hda", LIBWC_OBJECT_TYPE_HDATA);
-	init_object_type("inf", LIBWC_OBJECT_TYPE_INFO);
-	init_object_type("inl", LIBWC_OBJECT_TYPE_INFOLIST);
-	init_object_type("arr", LIBWC_OBJECT_TYPE_ARRAY);
+    init_object_type("chr", LIBWC_OBJECT_TYPE_CHAR);
+    init_object_type("int", LIBWC_OBJECT_TYPE_INT);
+    init_object_type("lon", LIBWC_OBJECT_TYPE_LONG);
+    init_object_type("str", LIBWC_OBJECT_TYPE_STRING);
+    init_object_type("buf", LIBWC_OBJECT_TYPE_BUFFER);
+    init_object_type("ptr", LIBWC_OBJECT_TYPE_POINTER);
+    init_object_type("tim", LIBWC_OBJECT_TYPE_TIME);
+    init_object_type("htb", LIBWC_OBJECT_TYPE_HASHTABLE);
+    init_object_type("hda", LIBWC_OBJECT_TYPE_HDATA);
+    init_object_type("inf", LIBWC_OBJECT_TYPE_INFO);
+    init_object_type("inl", LIBWC_OBJECT_TYPE_INFOLIST);
+    init_object_type("arr", LIBWC_OBJECT_TYPE_ARRAY);
 }

@@ -21,8 +21,8 @@
 #define LIBWC_ERROR_RELAY (g_quark_from_static_string("libwc-relay-error"))
 
 typedef enum {
-	LIBWC_ERROR_RELAY_UNEXPECTED_EOM,
-	LIBWC_ERROR_RELAY_INVALID_DATA
+    LIBWC_ERROR_RELAY_UNEXPECTED_EOM,
+    LIBWC_ERROR_RELAY_INVALID_DATA
 } LibWCRelayError;
 
 #endif /* !LIBWEECHAT_H */
