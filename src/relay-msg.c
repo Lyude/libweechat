@@ -921,9 +921,12 @@ extract_objects(void *data,
 	return objects;
 
 extract_objects_error:
+	if (objects) {
+		for (GList *l = objects; l != NULL; l = l->next)
+			g_variant_unref(l->data);
+	}
 	g_warn_if_reached();
 
-	/* TODO: free memory here */
 	return NULL;
 }
 
@@ -942,7 +945,6 @@ libwc_relay_message_parse_data(void *data,
 	return message;
 
 libwc_relay_message_parse_data_error:
-	/* TODO: Fix memory leaks here */
 	g_free(message);
 
 	return NULL;
