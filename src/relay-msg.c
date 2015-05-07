@@ -186,22 +186,31 @@ get_variant_type_for_primitive_object_type(LibWCRelayObjectType type) {
     return variant_type;
 }
 
-/* Used to read a string of data from a message. A string in a weechat message
- * might not necessarily be character data, and may be something else, hence the
- * convience function here. This function increments pos on it's own
- */
-static void *
+static gchar *
 extract_string(void **pos,
                const void *end_ptr,
                gsize strlen_field_len,
+               gboolean allow_null,
                GError **error) {
     gint32 len = 0;
     void *str;
 
+    g_assert_null(*error);
+
     if (!extract_size(pos, end_ptr, strlen_field_len, &len, error))
         return FALSE;
 
-    g_return_val_if_fail(check_msg_bounds(*pos, end_ptr, len, error), NULL);
+    if (allow_null) {
+        if (len == -1)
+            return NULL;
+
+        if (len != 0) {
+            g_return_val_if_fail(check_msg_bounds(*pos, end_ptr, len, error),
+                                 NULL);
+        }
+    }
+    else
+        g_return_val_if_fail(check_msg_bounds(*pos, end_ptr, len, error), NULL);
 
     str = g_malloc0(len + 1);
     memcpy(str, *pos, len);
@@ -266,7 +275,7 @@ extract_long_object(void **pos,
     gchar *str;
     glong value;
 
-    str = extract_string(pos, end_ptr, OBJECT_LONG_LEN_LEN, error);
+    str = extract_string(pos, end_ptr, OBJECT_LONG_LEN_LEN, FALSE, error);
     if (!str)
         return NULL;
 
@@ -290,26 +299,15 @@ static GVariant *
 extract_string_object(void **pos,
                       const void *end_ptr,
                       GError **error) {
-    GVariant *object, *maybe_container;
-    gchar *str;
-    gint32 len = 0;
+    GVariant *object = NULL, *maybe_container;
+    gchar *str = NULL;
 
-    if (!extract_size(pos, end_ptr, OBJECT_STRING_LEN_LEN, &len, error))
+    str = extract_string(pos, end_ptr, OBJECT_STRING_LEN_LEN, TRUE, error);
+    if (*error)
         return NULL;
 
-    if (len == 0)
-        object = g_variant_new_string("");
-    else if (len == -1)
-        object = NULL;
-    else {
-        g_return_val_if_fail(check_msg_bounds(*pos, end_ptr, len, error), NULL);
-
-        str = g_new0(gchar, len + 1);
-        memcpy(str, *pos, len);
-
+    if (str)
         object = g_variant_new_take_string(str);
-        *pos += len;
-    }
 
     maybe_container = g_variant_new_maybe(G_VARIANT_TYPE_STRING, object);
 
@@ -398,7 +396,7 @@ extract_time_object(void **pos,
     guint64 value;
     gsize len = 0;
 
-    str = extract_string(pos, end_ptr, OBJECT_TIME_LEN_LEN, error);
+    str = extract_string(pos, end_ptr, OBJECT_TIME_LEN_LEN, FALSE, error);
     if (!str)
         return NULL;
 
@@ -547,7 +545,8 @@ extract_hdata_object(void **pos,
         LibWCRelayObjectType type;
     } *key_info;
 
-    hpath = extract_string(pos, end_ptr, OBJECT_HDATA_HPATH_LEN_LEN, error);
+    hpath = extract_string(pos, end_ptr, OBJECT_HDATA_HPATH_LEN_LEN, FALSE,
+                           error);
     if (!hpath)
         return NULL;
 
@@ -558,7 +557,7 @@ extract_hdata_object(void **pos,
      * all of the values in each hdata item to be in order, it's easier to do
      * this in an array */
     key_string = extract_string(pos, end_ptr, OBJECT_HDATA_KEY_STRING_LEN_LEN,
-                                error);
+                                FALSE, error);
     if (!key_string)
         goto extract_hdata_object_error;
 
