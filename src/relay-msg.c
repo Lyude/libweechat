@@ -28,8 +28,6 @@ typedef GVariant* (*LibWCObjectExtractor)(void**,
                                           const void*,
                                           GError**);
 
-#define GET_FIELD(data_, offset_, type_) (*((type_*)(&((gint8*)data_)[offset_])))
-
 #define OBJECT_ID_LEN  ((gsize)3)
 #define OBJECT_INT_LEN ((gsize)4)
 
@@ -359,7 +357,7 @@ extract_pointer_object(void **pos,
 
     /* If we have a length of 01, and the next byte is 0, we have a NULL
      * pointer */
-    if (len == 1 && GET_FIELD(*pos, 1, guint8) == 0) {
+    if (len == 1 && LIBWC_GET_FIELD(*pos, 1, guint8) == 0) {
         object = g_variant_new_uint64(0);
         *pos += 1;
     }

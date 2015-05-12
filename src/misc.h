@@ -16,4 +16,6 @@
 
 #define LIBWC_CONSTRUCTOR __attribute__ ((constructor))
 
+#define LIBWC_GET_FIELD(data_, offset_, type_) (*((type_*)(&((gint8*)data_)[offset_])))
+
 #endif /* !MISC_H */
