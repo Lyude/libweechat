@@ -21,7 +21,7 @@
 #include <stdio.h>
 #include <errno.h>
 
-GHashTable *cmd_identifiers;
+GHashTable *event_identifiers;
 GHashTable *type_identifiers;
 
 typedef GVariant* (*LibWCObjectExtractor)(void**,
@@ -928,11 +928,11 @@ extract_objects_error:
     return NULL;
 }
 
-LibWCCommandIdentifier
-extract_command_identifier(void **pos,
-                           const void *end_ptr,
-                           GError **error) {
-    LibWCCommandIdentifier cmd_identifier;
+LibWCEventIdentifier
+extract_event_id(void **pos,
+                 const void *end_ptr,
+                 GError **error) {
+    LibWCEventIdentifier event_id;
     gchar *identifier_string =
         extract_string(pos, end_ptr, OBJECT_STRING_LEN_LEN, TRUE, error);
 
@@ -940,10 +940,10 @@ extract_command_identifier(void **pos,
     if (!identifier_string)
         return 0;
 
-    cmd_identifier = (LibWCCommandIdentifier)g_hash_table_lookup(
-        cmd_identifiers, identifier_string);
+    event_id = (LibWCEventIdentifier)g_hash_table_lookup(
+        event_identifiers, identifier_string);
 
-    return cmd_identifier;
+    return event_id;
 }
 
 LibWCRelayMessage *
@@ -956,7 +956,7 @@ libwc_relay_message_parse_data(void *data,
 
     g_assert_null(*error);
 
-    message->id = extract_command_identifier(&pos, end_ptr, error);
+    message->id = extract_event_id(&pos, end_ptr, error);
     if (*error)
         goto libwc_relay_message_parse_data_error;
 
@@ -980,8 +980,8 @@ init_object_type(gchar *str,
 
 static inline void
 init_cmd_identifier(gchar *str,
-                    LibWCCommandIdentifier id) {
-    g_hash_table_insert(cmd_identifiers, str, GINT_TO_POINTER(id));
+                    LibWCEventIdentifier id) {
+    g_hash_table_insert(event_identifiers, str, GINT_TO_POINTER(id));
 }
 
 void
@@ -989,7 +989,7 @@ _libwc_init_msg_parser() LIBWC_CONSTRUCTOR;
 
 void
 _libwc_init_msg_parser() {
-    cmd_identifiers = g_hash_table_new(g_str_hash, g_str_equal);
+    event_identifiers = g_hash_table_new(g_str_hash, g_str_equal);
     type_identifiers = g_hash_table_new(g_str_hash, g_str_equal);
 
     init_object_type("chr", LIBWC_OBJECT_TYPE_CHAR);
@@ -1005,24 +1005,24 @@ _libwc_init_msg_parser() {
     init_object_type("inl", LIBWC_OBJECT_TYPE_INFOLIST);
     init_object_type("arr", LIBWC_OBJECT_TYPE_ARRAY);
 
-    init_cmd_identifier("_buffer_opened",           LIBWC_CMD_BUFFER_OPENED);
-    init_cmd_identifier("_buffer_type_changed",     LIBWC_CMD_BUFFER_TYPE_CHANGED);
-    init_cmd_identifier("_buffer_moved",            LIBWC_CMD_BUFFER_MOVED);
-    init_cmd_identifier("_buffer_merged",           LIBWC_CMD_BUFFER_MERGED);
-    init_cmd_identifier("_buffer_unmerged",         LIBWC_CMD_BUFFER_UNMERGED);
-    init_cmd_identifier("_buffer_hidden",           LIBWC_CMD_BUFFER_HIDDEN);
-    init_cmd_identifier("_buffer_unhidden",         LIBWC_CMD_BUFFER_UNHIDDEN);
-    init_cmd_identifier("_buffer_renamed",          LIBWC_CMD_BUFFER_RENAMED);
-    init_cmd_identifier("_buffer_title_changed",    LIBWC_CMD_BUFFER_TITLE_CHANGED);
-    init_cmd_identifier("_buffer_localvar_added",   LIBWC_CMD_BUFFER_LOCALVAR_ADDED);
-    init_cmd_identifier("_buffer_localvar_changed", LIBWC_CMD_BUFFER_LOCALVAR_CHANGED);
-    init_cmd_identifier("_buffer_localvar_removed", LIBWC_CMD_BUFFER_LOCALVAR_REMOVED);
-    init_cmd_identifier("_buffer_closing",          LIBWC_CMD_BUFFER_CLOSING);
-    init_cmd_identifier("_buffer_cleared",          LIBWC_CMD_BUFFER_CLEARED);
-    init_cmd_identifier("_buffer_line_added",       LIBWC_CMD_BUFFER_LINE_ADDED);
-    init_cmd_identifier("_nicklist",                LIBWC_CMD_NICKLIST);
-    init_cmd_identifier("_nicklist_diff",           LIBWC_CMD_NICKLIST_DIFF);
-    init_cmd_identifier("_pong",                    LIBWC_CMD_PONG);
-    init_cmd_identifier("_upgrade",                 LIBWC_CMD_UPGRADE);
-    init_cmd_identifier("_upgrade_ended",           LIBWC_CMD_UPGRADE_ENDED);
+    init_cmd_identifier("_buffer_opened",           LIBWC_EVENT_BUFFER_OPENED);
+    init_cmd_identifier("_buffer_type_changed",     LIBWC_EVENT_BUFFER_TYPE_CHANGED);
+    init_cmd_identifier("_buffer_moved",            LIBWC_EVENT_BUFFER_MOVED);
+    init_cmd_identifier("_buffer_merged",           LIBWC_EVENT_BUFFER_MERGED);
+    init_cmd_identifier("_buffer_unmerged",         LIBWC_EVENT_BUFFER_UNMERGED);
+    init_cmd_identifier("_buffer_hidden",           LIBWC_EVENT_BUFFER_HIDDEN);
+    init_cmd_identifier("_buffer_unhidden",         LIBWC_EVENT_BUFFER_UNHIDDEN);
+    init_cmd_identifier("_buffer_renamed",          LIBWC_EVENT_BUFFER_RENAMED);
+    init_cmd_identifier("_buffer_title_changed",    LIBWC_EVENT_BUFFER_TITLE_CHANGED);
+    init_cmd_identifier("_buffer_localvar_added",   LIBWC_EVENT_BUFFER_LOCALVAR_ADDED);
+    init_cmd_identifier("_buffer_localvar_changed", LIBWC_EVENT_BUFFER_LOCALVAR_CHANGED);
+    init_cmd_identifier("_buffer_localvar_removed", LIBWC_EVENT_BUFFER_LOCALVAR_REMOVED);
+    init_cmd_identifier("_buffer_closing",          LIBWC_EVENT_BUFFER_CLOSING);
+    init_cmd_identifier("_buffer_cleared",          LIBWC_EVENT_BUFFER_CLEARED);
+    init_cmd_identifier("_buffer_line_added",       LIBWC_EVENT_BUFFER_LINE_ADDED);
+    init_cmd_identifier("_nicklist",                LIBWC_EVENT_NICKLIST);
+    init_cmd_identifier("_nicklist_diff",           LIBWC_EVENT_NICKLIST_DIFF);
+    init_cmd_identifier("_pong",                    LIBWC_EVENT_PONG);
+    init_cmd_identifier("_upgrade",                 LIBWC_EVENT_UPGRADE);
+    init_cmd_identifier("_upgrade_ended",           LIBWC_EVENT_UPGRADE_ENDED);
 }

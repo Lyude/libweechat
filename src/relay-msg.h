@@ -17,27 +17,27 @@
 #include <glib.h>
 
 typedef enum {
-    LIBWC_CMD_BUFFER_OPENED           = 1,
-    LIBWC_CMD_BUFFER_TYPE_CHANGED     = 2,
-    LIBWC_CMD_BUFFER_MOVED            = 3,
-    LIBWC_CMD_BUFFER_MERGED           = 4,
-    LIBWC_CMD_BUFFER_UNMERGED         = 5,
-    LIBWC_CMD_BUFFER_HIDDEN           = 6,
-    LIBWC_CMD_BUFFER_UNHIDDEN         = 7,
-    LIBWC_CMD_BUFFER_RENAMED          = 8,
-    LIBWC_CMD_BUFFER_TITLE_CHANGED    = 9,
-    LIBWC_CMD_BUFFER_LOCALVAR_ADDED   = 10,
-    LIBWC_CMD_BUFFER_LOCALVAR_CHANGED = 11,
-    LIBWC_CMD_BUFFER_LOCALVAR_REMOVED = 12,
-    LIBWC_CMD_BUFFER_CLOSING          = 13,
-    LIBWC_CMD_BUFFER_CLEARED          = 14,
-    LIBWC_CMD_BUFFER_LINE_ADDED       = 15,
-    LIBWC_CMD_NICKLIST                = 16,
-    LIBWC_CMD_NICKLIST_DIFF           = 17,
-    LIBWC_CMD_PONG                    = 18,
-    LIBWC_CMD_UPGRADE                 = 19,
-    LIBWC_CMD_UPGRADE_ENDED           = 20
-} LibWCCommandIdentifier;
+    LIBWC_EVENT_BUFFER_OPENED           = 1,
+    LIBWC_EVENT_BUFFER_TYPE_CHANGED     = 2,
+    LIBWC_EVENT_BUFFER_MOVED            = 3,
+    LIBWC_EVENT_BUFFER_MERGED           = 4,
+    LIBWC_EVENT_BUFFER_UNMERGED         = 5,
+    LIBWC_EVENT_BUFFER_HIDDEN           = 6,
+    LIBWC_EVENT_BUFFER_UNHIDDEN         = 7,
+    LIBWC_EVENT_BUFFER_RENAMED          = 8,
+    LIBWC_EVENT_BUFFER_TITLE_CHANGED    = 9,
+    LIBWC_EVENT_BUFFER_LOCALVAR_ADDED   = 10,
+    LIBWC_EVENT_BUFFER_LOCALVAR_CHANGED = 11,
+    LIBWC_EVENT_BUFFER_LOCALVAR_REMOVED = 12,
+    LIBWC_EVENT_BUFFER_CLOSING          = 13,
+    LIBWC_EVENT_BUFFER_CLEARED          = 14,
+    LIBWC_EVENT_BUFFER_LINE_ADDED       = 15,
+    LIBWC_EVENT_NICKLIST                = 16,
+    LIBWC_EVENT_NICKLIST_DIFF           = 17,
+    LIBWC_EVENT_PONG                    = 18,
+    LIBWC_EVENT_UPGRADE                 = 19,
+    LIBWC_EVENT_UPGRADE_ENDED           = 20
+} LibWCEventIdentifier;
 
 typedef enum {
     LIBWC_OBJECT_TYPE_CHAR      = 1,
@@ -62,7 +62,7 @@ struct _LibWCRelayMessageObject {
 typedef struct _LibWCRelayMessageObject LibWCRelayMessageObject;
 
 struct _LibWCRelayMessage {
-    LibWCCommandIdentifier id;
+    LibWCEventIdentifier id;
     GList *objects;
 };
 

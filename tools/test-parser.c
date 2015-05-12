@@ -53,47 +53,47 @@ wc_type_to_string(LibWCRelayObjectType type) {
 }
 
 static char *
-wc_cmd_id_to_string(LibWCCommandIdentifier id) {
+wc_cmd_id_to_string(LibWCEventIdentifier id) {
     switch (id) {
-        case LIBWC_CMD_BUFFER_OPENED:
+        case LIBWC_EVENT_BUFFER_OPENED:
             return "Buffer opened";
-        case LIBWC_CMD_BUFFER_TYPE_CHANGED:
+        case LIBWC_EVENT_BUFFER_TYPE_CHANGED:
             return "Buffer type changed";
-        case LIBWC_CMD_BUFFER_MOVED:
+        case LIBWC_EVENT_BUFFER_MOVED:
             return "Buffer moved";
-        case LIBWC_CMD_BUFFER_MERGED:
+        case LIBWC_EVENT_BUFFER_MERGED:
             return "Buffer merged";
-        case LIBWC_CMD_BUFFER_UNMERGED:
+        case LIBWC_EVENT_BUFFER_UNMERGED:
             return "Buffer unmerged";
-        case LIBWC_CMD_BUFFER_HIDDEN:
+        case LIBWC_EVENT_BUFFER_HIDDEN:
             return "Buffer hidden";
-        case LIBWC_CMD_BUFFER_UNHIDDEN:
+        case LIBWC_EVENT_BUFFER_UNHIDDEN:
             return "Buffer unhidden";
-        case LIBWC_CMD_BUFFER_RENAMED:
+        case LIBWC_EVENT_BUFFER_RENAMED:
             return "Buffer renamed";
-        case LIBWC_CMD_BUFFER_TITLE_CHANGED:
+        case LIBWC_EVENT_BUFFER_TITLE_CHANGED:
             return "Buffer title changed";
-        case LIBWC_CMD_BUFFER_LOCALVAR_ADDED:
+        case LIBWC_EVENT_BUFFER_LOCALVAR_ADDED:
             return "Buffer localvar added";
-        case LIBWC_CMD_BUFFER_LOCALVAR_CHANGED:
+        case LIBWC_EVENT_BUFFER_LOCALVAR_CHANGED:
             return "Buffer localvar changed";
-        case LIBWC_CMD_BUFFER_LOCALVAR_REMOVED:
+        case LIBWC_EVENT_BUFFER_LOCALVAR_REMOVED:
             return "Buffer localvar removed";
-        case LIBWC_CMD_BUFFER_CLOSING:
+        case LIBWC_EVENT_BUFFER_CLOSING:
             return "Buffer closing";
-        case LIBWC_CMD_BUFFER_CLEARED:
+        case LIBWC_EVENT_BUFFER_CLEARED:
             return "Buffer cleared";
-        case LIBWC_CMD_BUFFER_LINE_ADDED:
+        case LIBWC_EVENT_BUFFER_LINE_ADDED:
             return "Buffer line added";
-        case LIBWC_CMD_NICKLIST:
+        case LIBWC_EVENT_NICKLIST:
             return "Nicklist";
-        case LIBWC_CMD_NICKLIST_DIFF:
+        case LIBWC_EVENT_NICKLIST_DIFF:
             return "Nicklist diff";
-        case LIBWC_CMD_PONG:
+        case LIBWC_EVENT_PONG:
             return "Pong";
-        case LIBWC_CMD_UPGRADE:
+        case LIBWC_EVENT_UPGRADE:
             return "Upgrade";
-        case LIBWC_CMD_UPGRADE_ENDED:
+        case LIBWC_EVENT_UPGRADE_ENDED:
             return "Upgrade ended";
         default:
             return "???";
