@@ -17,6 +17,7 @@
 #include <glib.h>
 
 typedef enum {
+    LIBWC_NOT_AN_EVENT                  = -1,
     LIBWC_EVENT_BUFFER_OPENED           = 1,
     LIBWC_EVENT_BUFFER_TYPE_CHANGED     = 2,
     LIBWC_EVENT_BUFFER_MOVED            = 3,

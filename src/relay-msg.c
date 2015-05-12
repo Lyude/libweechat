@@ -933,15 +933,27 @@ extract_event_id(void **pos,
                  const void *end_ptr,
                  GError **error) {
     LibWCEventIdentifier event_id;
+    void *new_pos = *pos;
     gchar *identifier_string =
-        extract_string(pos, end_ptr, OBJECT_STRING_LEN_LEN, TRUE, error);
+        extract_string(&new_pos, end_ptr, OBJECT_STRING_LEN_LEN, TRUE, error);
 
     /* If the string is NULL, there's no ID */
-    if (!identifier_string)
+    if (!identifier_string) {
+        *pos = new_pos;
         return 0;
+    }
 
     event_id = (LibWCEventIdentifier)g_hash_table_lookup(
         event_identifiers, identifier_string);
+
+    /* If we don't recongnize the event identifier, then it's a response
+     * identifier and we shouldn't move the pointer forward. Return 0 and let
+     * the caller handle the rest
+     */
+    if (!event_id)
+        return LIBWC_NOT_AN_EVENT;
+
+    *pos = new_pos;
 
     return event_id;
 }
