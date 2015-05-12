@@ -11,7 +11,7 @@
  * details.
  */
 #include "libweechat.h"
-#include "relay-msg.h"
+#include "relay-parser.h"
 #include "misc.h"
 
 #include <glib.h>

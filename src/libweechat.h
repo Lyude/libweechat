@@ -16,7 +16,7 @@
 
 #include <glib.h>
 
-#include "relay-msg.h"
+#include "relay-parser.h"
 
 #define LIBWC_ERROR_RELAY (g_quark_from_static_string("libwc-relay-error"))
 

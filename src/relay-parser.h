@@ -11,8 +11,8 @@
  * more details.
  */
 
-#ifndef RELAY_MSG_H
-#define RELAY_MSG_H
+#ifndef RELAY_PARSER_H
+#define RELAY_PARSER_H
 
 #include <glib.h>
 
@@ -73,4 +73,4 @@ LibWCRelayMessage *libwc_relay_message_parse_data(void *data,
                                                   gsize size,
                                                   GError **error);
 
-#endif /* !RELAY_MSG_H */
+#endif /* !RELAY_PARSER_H */
