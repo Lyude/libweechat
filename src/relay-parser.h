@@ -16,6 +16,9 @@
 
 #include <glib.h>
 
+#define LIBWC_OBJECT_STRING_VARIANT_TYPE (G_VARIANT_TYPE("ms"))
+#define LIBWC_OBJECT_BUFFER_VARIANT_TYPE (G_VARIANT_TYPE("may"))
+
 typedef enum {
     LIBWC_NOT_AN_EVENT                  = -1,
     LIBWC_EVENT_BUFFER_OPENED           = 1,

@@ -47,10 +47,6 @@ typedef GVariant* (*LibWCObjectExtractor)(void**,
 #define OBJECT_HDATA_KEY_STRING_LEN_LEN ((gsize)4)
 #define OBJECT_INFOLIST_LEN_LEN         ((gsize)4)
 
-/* Variant types for objects that can't use primitive variants */
-#define OBJECT_STRING_VARIANT_TYPE (G_VARIANT_TYPE("ms"))
-#define OBJECT_BUFFER_VARIANT_TYPE (G_VARIANT_TYPE("may"))
-
 static inline gboolean
 check_msg_bounds(const void *pos,
                  const void *end_ptr,
@@ -165,10 +161,10 @@ get_variant_type_for_primitive_object_type(LibWCRelayObjectType type) {
             variant_type = G_VARIANT_TYPE_INT64;
             break;
         case LIBWC_OBJECT_TYPE_STRING:
-            variant_type = OBJECT_STRING_VARIANT_TYPE;
+            variant_type = LIBWC_OBJECT_STRING_VARIANT_TYPE;
             break;
         case LIBWC_OBJECT_TYPE_BUFFER:
-            variant_type = OBJECT_BUFFER_VARIANT_TYPE;
+            variant_type = LIBWC_OBJECT_BUFFER_VARIANT_TYPE;
             break;
         case LIBWC_OBJECT_TYPE_POINTER:
         case LIBWC_OBJECT_TYPE_TIME:
@@ -332,7 +328,7 @@ extract_buffer_object(void **pos,
 
         data = g_memdup(*pos, len);
         object =
-            g_variant_new_from_data(OBJECT_BUFFER_VARIANT_TYPE, data, len,
+            g_variant_new_from_data(LIBWC_OBJECT_BUFFER_VARIANT_TYPE, data, len,
                                     FALSE, g_free, data);
         *pos += len;
     }
