@@ -12,6 +12,7 @@
  */
 #include "libweechat.h"
 #include "relay-parser.h"
+#include "relay-private.h"
 #include "misc.h"
 
 #include <glib.h>
@@ -46,6 +47,14 @@ typedef GVariant* (*LibWCObjectExtractor)(void**,
 #define OBJECT_HDATA_HPATH_LEN_LEN      ((gsize)4)
 #define OBJECT_HDATA_KEY_STRING_LEN_LEN ((gsize)4)
 #define OBJECT_INFOLIST_LEN_LEN         ((gsize)4)
+
+void
+_libwc_relay_message_free(LibWCRelayMessage *message) {
+    if (message->type == LIBWC_RELAY_MESSAGE_TYPE_RESPONSE)
+        g_free(message->response_id);
+
+    g_free(message);
+}
 
 static inline gboolean
 check_msg_bounds(const void *pos,
@@ -945,35 +954,47 @@ extract_event_id(void **pos,
      * the caller handle the rest
      */
     if (!event_id)
-        return LIBWC_NOT_AN_EVENT;
+        event_id = LIBWC_NOT_AN_EVENT;
 
     *pos = new_pos;
 
+    g_free(identifier_string);
     return event_id;
 }
 
 LibWCRelayMessage *
-libwc_relay_message_parse_data(void *data,
-                               gsize size,
-                               GError **error) {
+_libwc_relay_message_parse_data(void *data,
+                                gsize size,
+                                GError **error) {
     void *pos = data;
     const void *end_ptr = data + size;
     LibWCRelayMessage *message = g_new(LibWCRelayMessage, 1);
 
     g_assert_null(*error);
 
-    message->id = extract_event_id(&pos, end_ptr, error);
+    message->event_id = extract_event_id(&pos, end_ptr, error);
     if (*error)
         goto libwc_relay_message_parse_data_error;
 
-    message->objects = extract_objects(&pos, data + size, error);
+    if (message->event_id != LIBWC_NOT_AN_EVENT)
+        message->type = LIBWC_RELAY_MESSAGE_TYPE_EVENT;
+    else {
+        message->response_id =
+            extract_string(&pos, end_ptr, OBJECT_STRING_LEN_LEN, FALSE, error);
+        if (!message->response_id)
+            goto libwc_relay_message_parse_data_error;
+
+        message->type = LIBWC_RELAY_MESSAGE_TYPE_RESPONSE;
+    }
+
+    message->objects = extract_objects(&pos, end_ptr, error);
     if (!message->objects)
         goto libwc_relay_message_parse_data_error;
 
     return message;
 
 libwc_relay_message_parse_data_error:
-    g_free(message);
+    _libwc_relay_message_free(message);
 
     return NULL;
 }

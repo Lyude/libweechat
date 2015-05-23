@@ -11,18 +11,18 @@
  * details.
  */
 
-#ifndef LIBWEECHAT_H
-#define LIBWEECHAT_H
+#ifndef RELAY_EVENT_H
+#define RELAY_EVENT_H
+
+#include "relay.h"
+#include "relay-parser.h"
 
 #include <glib.h>
 
-#include "relay.h"
+typedef void (*LibWCEventHandler)(LibWCRelay *relay,
+                                  LibWCRelayMessage *event);
 
-#define LIBWC_ERROR_RELAY (g_quark_from_static_string("libwc-relay-error"))
+LibWCEventHandler _libwc_relay_event_get_handler(LibWCEventIdentifier id)
+G_GNUC_INTERNAL G_GNUC_PURE;
 
-typedef enum {
-    LIBWC_ERROR_RELAY_UNEXPECTED_EOM,
-    LIBWC_ERROR_RELAY_INVALID_DATA
-} LibWCRelayError;
-
-#endif /* !LIBWEECHAT_H */
+#endif /* !RELAY_EVENT_H */

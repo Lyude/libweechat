@@ -15,6 +15,7 @@
 #define RELAY_PARSER_H
 
 #include <glib.h>
+#include <gio/gio.h>
 
 #define LIBWC_OBJECT_STRING_VARIANT_TYPE_STR "ms"
 #define LIBWC_OBJECT_BUFFER_VARIANT_TYPE_STR "may"
@@ -69,14 +70,27 @@ struct _LibWCRelayMessageObject {
 typedef struct _LibWCRelayMessageObject LibWCRelayMessageObject;
 
 struct _LibWCRelayMessage {
-    LibWCEventIdentifier id;
+    enum {
+        LIBWC_RELAY_MESSAGE_TYPE_EVENT,
+        LIBWC_RELAY_MESSAGE_TYPE_RESPONSE
+    } type;
+
+    union {
+        LibWCEventIdentifier event_id;
+        gchar *response_id;
+    };
+
     GList *objects;
 };
 
 typedef struct _LibWCRelayMessage LibWCRelayMessage;
 
-LibWCRelayMessage *libwc_relay_message_parse_data(void *data,
-                                                  gsize size,
-                                                  GError **error);
+LibWCRelayMessage * _libwc_relay_message_parse_data(void *data,
+                                                    gsize size,
+                                                    GError **error)
+G_GNUC_INTERNAL G_GNUC_MALLOC G_GNUC_WARN_UNUSED_RESULT;
+
+void
+_libwc_relay_message_free(LibWCRelayMessage *message);
 
 #endif /* !RELAY_PARSER_H */

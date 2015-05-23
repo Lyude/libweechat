@@ -12,6 +12,7 @@
  */
 
 #include "../src/libweechat.h"
+#include "../src/relay-parser.h"
 
 #include <glib.h>
 #include <stdio.h>
@@ -117,16 +118,16 @@ int main(int argc, char *argv[]) {
                          -1);
 
     /* We start at 5 bytes after data so that we can skip the header */
-    message = libwc_relay_message_parse_data(data + 5, data_len - 5, &error);
+    message = _libwc_relay_message_parse_data(data + 5, data_len - 5, &error);
     if (!message) {
         fprintf(stderr, "Failed to parse message: %s\n",
                 error->message);
         exit(1);
     }
 
-    if (message->id)
+    if (message->event_id)
         printf("Message ID: %s\n",
-               wc_cmd_id_to_string(message->id));
+               wc_cmd_id_to_string(message->event_id));
     else
         printf("Message ID: None\n");
 
