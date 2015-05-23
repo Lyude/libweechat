@@ -48,10 +48,19 @@ typedef GVariant* (*LibWCObjectExtractor)(void**,
 #define OBJECT_HDATA_KEY_STRING_LEN_LEN ((gsize)4)
 #define OBJECT_INFOLIST_LEN_LEN         ((gsize)4)
 
+static void
+_libwc_relay_message_object_free(LibWCRelayMessageObject *object) {
+    g_variant_unref(object->value);
+    g_slice_free(LibWCRelayMessageObject, object);
+}
+
 void
 _libwc_relay_message_free(LibWCRelayMessage *message) {
     if (message->type == LIBWC_RELAY_MESSAGE_TYPE_RESPONSE)
         g_free(message->response_id);
+
+    g_list_free_full(message->objects,
+                     (GDestroyNotify)_libwc_relay_message_object_free);
 
     g_free(message);
 }

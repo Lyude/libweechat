@@ -99,6 +99,8 @@ read_payload_cb(LibWCRelay *relay,
         event_handler(relay, parsed_message);
     }
 
+    _libwc_relay_message_free(parsed_message);
+
     relay->priv->read_cb = read_msg_header_cb;
     relay->priv->read_len = HEADER_SIZE;
 }
