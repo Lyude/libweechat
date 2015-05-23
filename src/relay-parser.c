@@ -904,7 +904,7 @@ extract_object(void **pos,
     if (!variant)
         return NULL;
 
-    object = g_slice_alloc(sizeof(object));
+    object = g_slice_alloc(sizeof(LibWCRelayMessageObject));
     object->type = type;
     object->value = variant;
 
