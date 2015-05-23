@@ -49,7 +49,7 @@ _libwc_relay_pending_tasks_add(LibWCRelay *relay,
                                GTask *task) {
     g_mutex_lock(&relay->priv->pending_tasks_mutex);
     g_hash_table_insert(relay->priv->pending_tasks, GUINT_TO_POINTER(id),
-                        g_object_ref(task));
+                        g_object_ref_sink(task));
     g_mutex_unlock(&relay->priv->pending_tasks_mutex);
 }
 
@@ -85,6 +85,8 @@ libwc_relay_ping_async(LibWCRelay *relay,
     command_data = g_bytes_new_take(command_string, strlen(command_string));
     _libwc_relay_connection_queue_command(relay, command_data, task, id,
                                           cancellable);
+
+    g_bytes_unref(command_data);
 }
 
 void
@@ -120,6 +122,8 @@ libwc_relay_ping_finish(LibWCRelay *relay,
     g_return_val_if_fail(g_task_is_valid(res, relay), FALSE);
 
     result = g_task_propagate_pointer(G_TASK(res), error);
+
+    g_object_unref(res);
 
     return result;
 }
