@@ -58,13 +58,11 @@ _libwc_event_handler_pong(LibWCRelay *relay,
     command_id = strtoul(ping_args[0], NULL, 16);
     IGNORE_EVENT_IF_FAIL(errno == 0);
 
-    pending_task = g_hash_table_lookup(relay->priv->pending_tasks,
-                                       GUINT_TO_POINTER(command_id));
+    pending_task = _libwc_relay_pending_tasks_lookup(relay, command_id);
     IGNORE_EVENT_IF_FAIL(pending_task != NULL);
 
     g_task_return_pointer(pending_task, ping_args[1], g_free);
-    g_hash_table_remove(relay->priv->pending_tasks,
-                        GUINT_TO_POINTER(command_id));
+    _libwc_relay_pending_tasks_remove(relay, command_id);
 
     /* Mark the second argument as NULL, so it doesn't get freed with the rest
      * of the arguments */

@@ -30,6 +30,10 @@ void _libwc_relay_pending_tasks_remove(LibWCRelay *relay,
                                        guint id)
 G_GNUC_INTERNAL;
 
+GTask * _libwc_relay_pending_tasks_lookup(LibWCRelay *relay,
+                                          guint id)
+G_GNUC_INTERNAL G_GNUC_WARN_UNUSED_RESULT;
+
 static inline gchar * _libwc_command_id_to_string(guint id)
 G_GNUC_WARN_UNUSED_RESULT G_GNUC_MALLOC;
 

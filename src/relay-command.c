@@ -61,6 +61,18 @@ _libwc_relay_pending_tasks_remove(LibWCRelay *relay,
     g_mutex_unlock(&relay->priv->pending_tasks_mutex);
 }
 
+GTask *
+_libwc_relay_pending_tasks_lookup(LibWCRelay *relay,
+                                  guint id) {
+    GTask *task;
+
+    g_mutex_lock(&relay->priv->pending_tasks_mutex);
+    task = g_hash_table_lookup(relay->priv->pending_tasks, GUINT_TO_POINTER(id));
+    g_mutex_unlock(&relay->priv->pending_tasks_mutex);
+
+    return task;
+}
+
 void
 libwc_relay_ping_async(LibWCRelay *relay,
                        GCancellable *cancellable,
