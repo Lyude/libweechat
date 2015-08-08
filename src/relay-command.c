@@ -80,25 +80,17 @@ libwc_relay_ping_async(LibWCRelay *relay,
                        void *user_data,
                        const gchar *ping_string) {
     guint id = _libwc_command_id_new(relay);
-    gchar *command_string;
-    GBytes *command_data;
     GTask *task;
 
     task = g_task_new(relay, cancellable, callback, user_data);
     _libwc_relay_pending_tasks_add(relay, id, task);
 
     if (ping_string)
-        command_string = g_strdup_printf("ping %x %s\n",
-                                         id, ping_string);
+        _libwc_relay_connection_queue_cmd(relay, task, id, cancellable,
+                                          "ping %x %s\n", id, ping_string);
     else
-        command_string = g_strdup_printf("ping %x\n",
-                                         id);
-
-    command_data = g_bytes_new_take(command_string, strlen(command_string));
-    _libwc_relay_connection_queue_command(relay, command_data, task, id,
-                                          cancellable);
-
-    g_bytes_unref(command_data);
+        _libwc_relay_connection_queue_cmd(relay, task, id, cancellable,
+                                          "ping %x\n", id);
 }
 
 void

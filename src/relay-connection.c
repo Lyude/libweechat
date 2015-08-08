@@ -25,6 +25,7 @@
 #include <gio/gio.h>
 #include <sys/mman.h>
 #include <string.h>
+#include <stdarg.h>
 
 #define HEADER_SIZE ((gsize)5)
 
@@ -49,6 +50,37 @@ queued_write_free(LibWCQueuedWrite *queued_write) {
         g_object_unref(queued_write->cancellable);
 
     g_free(queued_write);
+}
+
+static LibWCQueuedWrite *
+queued_write_new(LibWCRelay *relay,
+                 GBytes *data,
+                 GTask *task,
+                 guint id,
+                 GCancellable *cancellable) {
+    LibWCQueuedWrite *queued_write = g_new0(LibWCQueuedWrite, 1);
+
+    if (cancellable) {
+        queued_write->cancellable = g_object_ref(cancellable);
+        queued_write->cancellable_id =
+            g_cancellable_connect(cancellable,
+                                  G_CALLBACK(queued_write_free),
+                                  queued_write, NULL);
+    }
+
+    if (task) {
+        if (!id)
+            id = _libwc_command_id_new(relay);
+
+        _libwc_relay_pending_tasks_add(relay, id, task);
+    }
+
+    *queued_write = (LibWCQueuedWrite) {
+        .relay = g_object_ref(relay),
+        .data = g_bytes_ref(data),
+    };
+
+    return queued_write;
 }
 
 void
@@ -210,47 +242,58 @@ queued_write_cb(GObject *source_object,
 }
 
 void
-_libwc_relay_connection_queue_command(LibWCRelay *relay,
-                                      GBytes *data,
-                                      GTask *task,
-                                      guint id,
-                                      GCancellable *cancellable) {
-    LibWCQueuedWrite *queued_write = g_new0(LibWCQueuedWrite, 1);
-
-    *queued_write = (LibWCQueuedWrite) {
-        .relay = g_object_ref(relay),
-        .data = g_bytes_ref(data)
-    };
-
-    if (cancellable) {
-        queued_write->cancellable = g_object_ref(cancellable);
-        queued_write->cancellable_id =
-            g_cancellable_connect(cancellable,
-                                  G_CALLBACK(queued_write_free),
-                                  queued_write, NULL);
-    }
-
-    if (task) {
-        if (!id)
-            id = _libwc_command_id_new(relay);
-
-        _libwc_relay_pending_tasks_add(relay, id, task);
-    }
+queue_write(LibWCRelay *relay,
+            LibWCQueuedWrite *write) {
+    gsize queue_length;
 
     g_async_queue_lock(relay->priv->pending_writes);
+    queue_length = g_async_queue_length_unlocked(relay->priv->pending_writes);
 
-    if (g_async_queue_length_unlocked(relay->priv->pending_writes) <= 0) {
-        g_async_queue_push_unlocked(relay->priv->pending_writes, queued_write);
-        g_async_queue_unlock(relay->priv->pending_writes);
+    g_async_queue_push_unlocked(relay->priv->pending_writes, write);
+    g_async_queue_unlock(relay->priv->pending_writes);
 
-        g_output_stream_write_bytes_async(relay->priv->output_stream, data,
-                                          G_PRIORITY_DEFAULT, cancellable,
-                                          queued_write_cb, queued_write);
-    }
-    else {
-        g_async_queue_push_unlocked(relay->priv->pending_writes, queued_write);
-        g_async_queue_unlock(relay->priv->pending_writes);
-    }
+    if (queue_length <= 0)
+        g_output_stream_write_bytes_async(relay->priv->output_stream,
+                                          write->data, G_PRIORITY_DEFAULT,
+                                          write->cancellable,
+                                          queued_write_cb, write);
+}
+
+void
+_libwc_relay_connection_queue_cmd(LibWCRelay *relay,
+                                  GTask *task,
+                                  guint id,
+                                  GCancellable *cancellable,
+                                  const gchar *format,
+                                  ...) {
+    LibWCQueuedWrite *queued_write;
+    gchar *cmd_string;
+    GBytes *data;
+    va_list ap;
+
+    va_start(ap, format);
+    cmd_string = g_strdup_vprintf(format, ap);
+    va_end(ap);
+
+    data = g_bytes_new_take(cmd_string, strlen(cmd_string) + 1);
+    queued_write = queued_write_new(relay, data, task, id, cancellable);
+
+    queue_write(relay, queued_write);
+}
+
+void
+_libwc_relay_connection_queue_cmd_static(LibWCRelay *relay,
+                                         GTask *task,
+                                         guint id,
+                                         GCancellable *cancellable,
+                                         const gchar *command,
+                                         gsize len) {
+    LibWCQueuedWrite *queued_write;
+    GBytes *data;
+
+    data = g_bytes_new_static(command, len);
+    queued_write = queued_write_new(relay, data, task, id, cancellable);
+    queue_write(relay, queued_write);
 }
 
 static void
@@ -311,11 +354,6 @@ static void
 relay_connection_init_async_worker(GTask *task) {
     LibWCRelay *relay = LIBWC_RELAY(g_task_get_source_object(task));
     GCancellable *cancellable = g_task_get_cancellable(task);
-    gchar *init_string;
-    guint cmd_id;
-    gsize init_string_len, bytes_written;
-    GBytes *init_bytes;
-    GSource *input_stream_source;
 
     relay->priv->context = g_main_context_ref_thread_default();
 
@@ -330,24 +368,14 @@ relay_connection_init_async_worker(GTask *task) {
     relay->priv->read_cb = read_msg_header_cb;
     relay->priv->read_len = HEADER_SIZE;
 
-    if (relay->priv->password) {
-        init_string = g_strdup_printf("init password=%s\n",
-                                      relay->priv->password);
-        init_string_len = strlen(init_string);
+    if (relay->priv->password)
+        _libwc_relay_connection_queue_cmd(relay, NULL, 0, cancellable,
+                                          "init password=%s\n",
+                                          relay->priv->password);
+    else
+        _libwc_relay_connection_queue_cmd_static(relay, NULL, 0, cancellable,
+                                                 "init\n", sizeof("init\n"));
 
-        g_warn_if_fail(mlock(init_string, init_string_len) == 0);
-
-        init_bytes = g_bytes_new_take(init_string, init_string_len);
-    }
-    else {
-        init_string = "init\n";
-        init_string_len = sizeof("init\n");
-
-        init_bytes = g_bytes_new_static(init_string, init_string_len);
-    }
-
-    _libwc_relay_connection_queue_command(relay, init_bytes, NULL, 0,
-                                          cancellable);
     /* The ping command won't work if the previous init command fails, so we can
      * use it to check whether or not we've successfully initialized */
     libwc_relay_ping_async(relay, cancellable,

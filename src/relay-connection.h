@@ -24,11 +24,20 @@ void _libwc_relay_connection_end_on_error(LibWCRelay *relay,
                                           GError *error)
 G_GNUC_INTERNAL;
 
-void _libwc_relay_connection_queue_command(LibWCRelay *relay,
-                                           GBytes *data,
-                                           GTask *task,
-                                           guint id,
-                                           GCancellable *cancellable)
+void _libwc_relay_connection_queue_cmd(LibWCRelay *relay,
+                                       GTask *task,
+                                       guint id,
+                                       GCancellable *cancellable,
+                                       const gchar *format,
+                                       ...)
+G_GNUC_INTERNAL;
+
+void _libwc_relay_connection_queue_cmd_static(LibWCRelay *relay,
+                                              GTask *task,
+                                              guint id,
+                                              GCancellable *cancellable,
+                                              const gchar *command,
+                                              gsize len)
 G_GNUC_INTERNAL;
 
 #endif /* !RELAY_CONNECTION_H */
