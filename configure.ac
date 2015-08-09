@@ -1,5 +1,6 @@
 AC_INIT([libweechat], [0.0], [thatslyude@gmail.com], [libweechat], [https://lyude.net])
-AM_INIT_AUTOMAKE([foreign -Wall])
+AC_PREREQ(2.62)
+AM_INIT_AUTOMAKE([foreign -Wall -Wno-portability])
 AC_CONFIG_MACRO_DIR([m4])
 
 # Check for programs
@@ -26,6 +27,7 @@ AM_SILENT_RULES([yes])
 
 PKG_CHECK_MODULES([GLIB], [glib-2.0])
 PKG_CHECK_MODULES([GIO], [gio-2.0])
+GOBJECT_INTROSPECTION_CHECK([1.44.0])
 
 LT_INIT
 

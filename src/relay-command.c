@@ -73,6 +73,17 @@ _libwc_relay_pending_tasks_lookup(LibWCRelay *relay,
     return task;
 }
 
+/**
+ * libwc_relay_ping_async:
+ * @relay: a #LibWCRelay
+ * @cancellable: (optional): option #GCancellable object, NULL to ignore
+ * @callback: the function to call when we receive a response to the ping
+ * @user_data: (closure): The data to pass to the callback
+ * @ping_string: (optional): A character string to send with the ping
+ *
+ * Asynchronously sends a ping to the relay, optionally with a character string
+ * attached.
+ */
 void
 libwc_relay_ping_async(LibWCRelay *relay,
                        GCancellable *cancellable,
@@ -116,6 +127,18 @@ libwc_relay_pingf_async(LibWCRelay *relay,
                                                  va_args));
 }
 
+/**
+ * libwc_relay_ping_finish:
+ * @relay: a #LibWCRelay
+ * @res: (out): a #GAsyncResult
+ * @error: (out) (optional): a #Gerror location to store the error occuring, or
+ * NULL to ignore
+ *
+ * Get the response to a ping that was sent to a weechat relay.
+ *
+ * Returns: The string attached to the ping. This is NULL if no string was sent
+ * with the ping in the first place.
+ */
 gchar *
 libwc_relay_ping_finish(LibWCRelay *relay,
                         GAsyncResult *res,
@@ -132,6 +155,20 @@ libwc_relay_ping_finish(LibWCRelay *relay,
     return result;
 }
 
+/**
+ * libwc_relay_ping:
+ * @relay: a #LibWCRelay
+ * @cancellable: (optional): option #GCancellable object, NULL to ignore
+ * @error: (out) (optional): a #Gerror location to store the error occuring, or
+ * NULL to ignore
+ * @ping_string: (optional): A character string to send with the ping
+ *
+ * Synchronously send a ping to a weechat relay. This is a blocking version of
+ * libwc_relay_ping_async().
+ *
+ * Returns: The string attached to the ping. This is NULL if no string was sent
+ * with the ping in the first place.
+ */
 gchar *
 libwc_relay_ping(LibWCRelay *relay,
                  GCancellable *cancellable,

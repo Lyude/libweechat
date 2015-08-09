@@ -24,24 +24,22 @@
 #define LIBWC_IS_RELAY_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE((klass), LIBWC_TYPE_RELAY))
 #define LIBWC_RELAY_GET_CLASS       (G_TYPE_INSTANCE_GET_CLASS((obj), LIBWC_TYPE_RELAY, LibWCRelayClass));
 
-typedef struct _LibWCRelay        LibWCRelay;
-typedef struct _LibWCRelayClass   LibWCRelayClass;
 typedef struct _LibWCRelayPrivate LibWCRelayPrivate;
 
-struct _LibWCRelay {
+typedef struct _LibWCRelay {
     GObject parent_instance;
 
+    /*< private >*/
     LibWCRelayPrivate *priv;
-};
+} LibWCRelay;
 
-struct _LibWCRelayClass {
+typedef struct _LibWCRelayClass {
     GObjectClass parent_class;
-};
+} LibWCRelayClass;
 
 GType libwc_relay_get_type();
 
-LibWCRelay * libwc_relay_new()
-G_GNUC_WARN_UNUSED_RESULT G_GNUC_MALLOC;
+LibWCRelay * libwc_relay_new();
 
 void libwc_relay_password_set(LibWCRelay *relay,
                               const gchar *password);

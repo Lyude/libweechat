@@ -22,6 +22,26 @@
 #include <string.h>
 #include <sys/mman.h>
 
+/**
+ * LibWCRelay:
+ * @parent_instance: the parent instance
+ *
+ * An object representing a remote Weechat relay
+ */
+
+/**
+ * LibWCRelayClass:
+ * @parent_class: the parent class
+ *
+ * The class for #LibWCRelay
+ */
+
+/**
+ * LibWCRelayPrivate:
+ *
+ * Private stuff man
+ */
+
 /* TODO:
  * - Eventually implement a synchronous version of initializing the relay. We're
  *   not going to be using it, but someone else might want to
@@ -55,6 +75,11 @@ libwc_relay_init(LibWCRelay *self) {
     self->priv = libwc_relay_get_instance_private(self);
 }
 
+/**
+ * libwc_relay_new:
+ *
+ * Returns: (transfer full): a new #LibWCRelay object
+ */
 LibWCRelay *
 libwc_relay_new() {
     LibWCRelay *relay;
@@ -94,6 +119,13 @@ async_initable_iface_init_finish(GAsyncInitable *initable,
     return libwc_relay_connection_init_finish(relay, res, error);
 }
 
+/**
+ * libwc_relay_password_set:
+ * @relay: a #LibWCRelay
+ * @password: The password for the #LibWCRelay
+ *
+ * Sets the associated password for a #LibWCRelay object
+ */
 void
 libwc_relay_password_set(LibWCRelay *relay,
                          const gchar *password) {
@@ -110,6 +142,15 @@ libwc_relay_password_set(LibWCRelay *relay,
     strcpy(relay->priv->password, password);
 }
 
+/**
+ * libwc_relay_connection_set:
+ * @relay: a #LibWCRelay
+ * @stream: (in): The GIOStream to use for communicating with the weechat relay
+ * @socket: (in): The socket to poll for messages from the weechat relay on
+ *
+ * Sets the connection information that a #LibWCRelay object should use to
+ * connect to the remote Weechat relay
+ */
 void
 libwc_relay_connection_set(LibWCRelay *relay,
                            GIOStream *stream,

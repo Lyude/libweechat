@@ -385,6 +385,15 @@ relay_connection_init_async_worker(GTask *task) {
     g_main_loop_run(relay->priv->main_loop);
 }
 
+/**
+ * libwc_relay_connection_init_async:
+ * @relay: a #LibWCRelay
+ * @cancellable: (optional): optional #GCancellable object, NULL to ignore
+ * @callback: (scope async): callback to call when the request is satisfied
+ * @user_data: (closure): The data to pass to the callback
+ *
+ * Asynchronously connect to a Weechat relay.
+ */
 void
 libwc_relay_connection_init_async(LibWCRelay *relay,
                                   GCancellable *cancellable,
@@ -407,6 +416,17 @@ libwc_relay_connection_init_async(LibWCRelay *relay,
         init_task);
 }
 
+/**
+ * libwc_relay_connection_init_finish:
+ * @relay: a #LibWCRelay
+ * @res: (out): a #GAsyncResult
+ * @error: (out) (optional): a #Gerror location to store the error occuring, or
+ * NULL to ignore
+ *
+ * Get the results of an attempt to connect asynchronously to a Weechat relay.
+ *
+ * Returns: TRUE on success, FALSE if an error occured
+ */
 gboolean
 libwc_relay_connection_init_finish(LibWCRelay *relay,
                                    GAsyncResult *res,
@@ -421,6 +441,17 @@ libwc_relay_connection_init_finish(LibWCRelay *relay,
     return result;
 }
 
+/**
+ * libwc_relay_connection_init:
+ * @relay: a #LibWCRelay
+ * @cancellable: (optional): option #GCancellable object, NULL to ignore
+ * @error: (out) (optional): a #Gerror location to store the error occuring, or
+ * NULL to ignore
+ *
+ * A synchronous, blocking version of libwc_relay_connection_init()
+ *
+ * Returns: TRUE on success, FALSE if an error occured
+ */
 gboolean
 libwc_relay_connection_init(LibWCRelay *relay,
                             GCancellable *cancellable,
